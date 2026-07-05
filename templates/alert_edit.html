@@ -1,0 +1,597 @@
+{% extends 'layout.html' %}
+
+{% block title %}게시글 수정{% endblock %}
+
+{% block content %}
+<style>
+    main {
+        padding: 0 !important;
+    }
+
+    .edit-container {
+        padding: 0;
+        background: #fcfcfc;
+        min-height: 100%;
+        display: flex;
+        flex-direction: column;
+	padding-bottom: calc(80px + env(safe-area-inset-bottom));
+    }
+
+    .edit-header {
+        position: sticky;
+        top: -1px;
+        z-index: 100;
+        background: #ffffff;
+        padding: 14px 20px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .back-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f5f5f5;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+        flex-shrink: 0;
+    }
+
+    .back-btn:active {
+        transform: scale(0.95);
+        background: #eee;
+    }
+
+    .media-preview-section {
+        width: 100%;
+        aspect-ratio: 4/3;
+        background: #111;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .media-preview-section img,
+    .media-preview-section video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .media-overlay-badge {
+        position: absolute;
+        top: 16px;
+        left: 16px;
+        background: rgba(0,0,0,0.55);
+        color: #fff;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        backdrop-filter: blur(4px);
+    }
+
+    .edit-card {
+        background: white;
+        padding: 24px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+    }
+
+    .section-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: var(--point-orange);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .edit-input,
+    .edit-textarea {
+        width: 100%;
+        background: #f8fafc;
+        border: 1.5px solid #f0f0f0;
+        border-radius: 16px;
+        padding: 14px 16px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #1a1a2e;
+        outline: none;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        font-family: inherit;
+        box-sizing: border-box;
+    }
+
+    .edit-input:focus,
+    .edit-textarea:focus {
+        border-color: var(--point-orange);
+        box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.12);
+        background: #fff;
+    }
+
+    .edit-textarea {
+        resize: none;
+        min-height: 110px;
+        line-height: 1.6;
+    }
+
+    .char-counter {
+        text-align: right;
+        font-size: 0.72rem;
+        color: #aaa;
+        margin-top: 5px;
+        font-weight: 600;
+    }
+
+    .char-counter.warn {
+        color: var(--point-orange);
+    }
+
+    #edit-map {
+        width: 100%;
+        height: 200px;
+        border-radius: 20px;
+        margin-top: 10px;
+        border: 1px solid rgba(0, 0, 0, 0.03);
+        pointer-events: none;
+        opacity: 0.85;
+    }
+
+    .map-readonly-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: #f1f5f9;
+        color: #94a3b8;
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 8px;
+        margin-top: 8px;
+    }
+
+    .save-btn-wrap {
+        padding: 16px 20px;
+        margin-bottom: env(safe-area-inset-bottom);
+    }
+
+    .save-btn {
+        width: 100%;
+        height: 54px;
+        border-radius: 18px;
+        background: var(--point-orange);
+        color: white;
+        font-size: 1rem;
+        font-weight: 800;
+        border: none;
+        cursor: pointer;
+        box-shadow: 0 6px 20px rgba(255, 140, 0, 0.35);
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    .save-btn:active {
+        transform: scale(0.98);
+        box-shadow: 0 3px 10px rgba(255, 140, 0, 0.25);
+    }
+
+    .save-btn:disabled {
+        background: #e2e8f0;
+        color: #94a3b8;
+        box-shadow: none;
+        cursor: not-allowed;
+    }
+
+    /* 커스텀 얼럿 모달 */
+    .custom-alert-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.4);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+        padding: 20px;
+        opacity: 0;
+        transition: opacity 0.25s ease-out;
+    }
+
+    .custom-alert-backdrop.show {
+        display: flex;
+        opacity: 1;
+    }
+
+    .custom-alert-card {
+        width: min(92vw, 380px);
+        background: #fff;
+        border-radius: 28px;
+        overflow: hidden;
+        box-shadow: 0 30px 70px rgba(0, 0, 0, 0.25);
+        transform: translateY(20px);
+        transition: transform 0.3s cubic-bezier(0.17, 0.67, 0.43, 1.15);
+        text-align: center;
+    }
+
+    .custom-alert-backdrop.show .custom-alert-card {
+        transform: translateY(0);
+    }
+
+    .custom-alert-body {
+        padding: 32px 24px 24px;
+    }
+
+    .alert-icon {
+        font-size: 42px;
+        color: var(--point-orange);
+        margin-bottom: 16px;
+    }
+
+    .alert-title {
+        font-size: 19px;
+        font-weight: 900;
+        color: #0f172a;
+        margin-bottom: 8px;
+    }
+
+    .alert-desc {
+        font-size: 15px;
+        color: #64748b;
+        line-height: 1.5;
+    }
+
+    .alert-footer {
+        display: flex;
+        gap: 8px;
+        padding: 0 24px 24px;
+    }
+
+    .alert-btn {
+        flex: 1;
+        height: 50px;
+        border-radius: 16px;
+        font-size: 15px;
+        font-weight: 800;
+        cursor: pointer;
+        border: none;
+        transition: all 0.2s;
+    }
+
+    .btn-secondary { background: #f1f5f9; color: #475569; }
+    .btn-primary   { background: var(--point-orange); color: #fff; }
+    .alert-btn:active { transform: scale(0.96); }
+</style>
+
+<div id="safe-report-context" data-report-id="{{ detail.id }}" style="display:none;"></div>
+
+<div class="edit-container">
+
+    <!-- 헤더 -->
+    <div class="edit-header">
+        <button class="back-btn" onclick="history.back()">
+            <i class="bi bi-chevron-left"></i>
+        </button>
+        <h3 style="margin:0; font-size:1.1rem; font-weight:800; flex:1;">게시글 수정</h3>
+        <span style="font-size:0.75rem; color:#aaa; font-weight:600;">본인 게시글</span>
+    </div>
+
+    <!-- 미디어 미리보기 (클릭하여 변경하능) -->
+<div class="media-preview-section" style="position: relative; cursor: pointer;" onclick="document.getElementById('edit-file').click()">
+    <div id="current-media-display" style="width:100%; height:100%;">
+        {% if detail.file_type == 'video' and detail.file_path %}
+        <video src="{{ detail.file_path }}" muted playsinline style="width:100%; height:100%; object-fit:cover;"></video>
+        {% elif detail.thumbnail_path %}
+        <img src="{{ detail.thumbnail_path }}" alt="신고 사진">
+        {% elif detail.file_path %}
+        <img src="{{ detail.file_path }}" alt="신고 사진">
+        {% else %}
+        <div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:#1a1a2e;">
+            <i class="bi bi-image" style="font-size:3rem; opacity:0.15; color:white;"></i>
+        </div>
+        {% endif %}
+    </div>
+
+    <img id="new-image-preview" src="" alt="새 사진 미리보기" style="display:none; width:100%; height:100%; object-fit:cover;">
+
+    <input type="file" id="edit-file" name="file" accept="image/*,video/*" style="display:none;" onchange="previewNewFile(this)">
+
+    <div class="media-overlay-badge" style="background: rgba(var(--point-orange-rgb, 255, 140, 0), 0.7);">
+        <i class="bi bi-camera-fill"></i>
+        클릭하여 미디어 변경
+    </div>
+</div>
+
+    <!-- 제목 카드 -->
+    <div class="edit-card" style="border-radius: 24px 24px 0 0; margin: 10px 20px 0 20px;">
+        <div class="section-label">
+            <i class="bi bi-pencil-fill"></i> 제목
+        </div>
+        <input
+            id="edit-title"
+            type="text"
+            class="edit-input"
+            maxlength="100"
+            placeholder="제목을 입력하세요"
+            value="{{ detail.title or '' }}"
+            oninput="updateCharCount('edit-title', 'title-counter', 100)"
+        >
+        <div class="char-counter" id="title-counter">
+            {{ (detail.title or '') | length }} / 100
+        </div>
+    </div>
+
+    <!-- 내용 카드 -->
+    <div class="edit-card" style="border-radius: 0; margin: 2px 20px 0 20px;">
+        <div class="section-label">
+            <i class="bi bi-card-text"></i> 내용
+        </div>
+        <textarea
+            id="edit-content"
+            class="edit-textarea"
+            maxlength="500"
+            placeholder="신고 내용을 입력하세요"
+            oninput="updateCharCount('edit-content', 'content-counter', 500)"
+        >{{ detail.content or '' }}</textarea>
+        <div class="char-counter" id="content-counter">
+            {{ (detail.content or '') | length }} / 500
+        </div>
+    </div>
+
+        <!-- 위치 카드 (읽기 전용) -->
+    <div class="edit-card" style="border-radius: 0 0 24px 24px; margin: 2px 20px 20px 20px;">
+        <div class="section-label">
+            <i class="bi bi-geo-alt-fill"></i> 신고 위치
+        </div>
+        <div style="font-size:0.85rem; font-weight:600; color:#475569; background:#f8fafc; border-radius:12px; padding:12px 14px;">
+            <i class="bi bi-pin-map" style="color:var(--point-orange); margin-right:6px;"></i>
+            {{ detail.address or '위치 정보 없음' }}
+        </div>
+        <div id="edit-map"></div>
+        <div class="map-readonly-badge">
+            <i class="bi bi-lock-fill"></i>
+            위치는 수정할 수 없습니다
+        </div>
+    </div>  
+
+    <!-- 저장 버튼 (edit-container 안, edit-card 밖) -->
+    <div class="save-btn-wrap">
+        <button class="save-btn" id="updateBtn" onclick="handleUpdate()">
+            <i class="bi bi-check-lg"></i> 수정 완료
+        </button>
+    </div>
+
+</div>
+
+<!-- 커스텀 얼럿 모달 -->
+<div id="customAlert" class="custom-alert-backdrop" onclick="if(event.target===this) hideAlert()">
+    <div class="custom-alert-card">
+        <div class="custom-alert-body">
+            <div class="alert-icon" id="alertIcon"><i class="bi bi-exclamation-circle-fill"></i></div>
+            <div class="alert-title" id="alertTitle">확인</div>
+            <div class="alert-desc" id="alertDesc">내용을 확인해주세요.</div>
+        </div>
+        <div class="alert-footer">
+            <button class="alert-btn btn-secondary" id="alertCancelBtn" onclick="hideAlert()">취소</button>
+            <button class="alert-btn btn-primary" id="alertConfirmBtn">확인</button>
+        </div>
+    </div>
+</div>
+
+
+<script>
+    /* ── [FIX] 전역 Promise resolve 참조 (hideAlert에서 사용) ── */
+    let alertPromiseResolve = null;
+
+     /* ── [신규] 새 파일 미리보기 함수 ── */
+    function previewNewFile(input) {
+        const currentMedia = document.getElementById('current-media-display');
+        const newPreview = document.getElementById('new-image-preview');
+
+        if (input.files && input.files[0]) {
+            const file = input.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                if (file.type.startsWith('image/')) {
+                    newPreview.src = e.target.result;
+                    newPreview.style.display = 'block';
+                    if (currentMedia) currentMedia.style.display = 'none';
+                } else if (file.type.startsWith('video/')) {
+                    newPreview.style.display = 'none';
+                    if (currentMedia) {
+                        currentMedia.innerHTML = '<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:#111;"><i class="bi bi-file-earmark-play" style="font-size:3rem; color:white;"></i><span style="color:white; margin-left:10px;">새 비디오 선택됨</span></div>';
+                        currentMedia.style.display = 'flex';
+                    }
+                    showAlert({ title: '알림', desc: '비디오 파일이 선택되었습니다. 저장 후 확인 가능합니다.', confirmOnly: true });
+                }
+            };
+
+            reader.readAsDataURL(file);
+        }
+    }
+
+    /* ── 1. 데이터 로드 확인 ── */
+    const contextEl = document.getElementById('safe-report-context');
+    const REPORT_ID = contextEl ? contextEl.dataset.reportId : null;
+    console.log("스크립트 로드 완료. REPORT_ID:", REPORT_ID);
+
+    /* ── 2. 글자 수 카운터 ── */
+    function updateCharCount(inputId, counterId, max) {
+        const el = document.getElementById(inputId);
+        const counter = document.getElementById(counterId);
+        if(!el || !counter) return;
+        const len = el.value.length;
+        counter.textContent = `${len} / ${max}`;
+    }
+
+    /* ── 3. 커스텀 얼럿 함수 ── */
+    function showAlert({ title, desc, icon = 'bi-exclamation-circle', confirmOnly = false }) {
+        return new Promise((resolve) => {
+            const modal = document.getElementById('customAlert');
+            if (!modal) {
+                const res = confirm(`${title}\n\n${desc}`);
+                resolve(res);
+                return;
+            }
+
+            document.getElementById('alertTitle').innerText = title;
+            document.getElementById('alertDesc').innerText = desc;
+            const cancelBtn = document.getElementById('alertCancelBtn');
+            if(cancelBtn) cancelBtn.style.display = confirmOnly ? 'none' : 'block';
+
+            // [FIX] 이전 Promise가 남아있으면 null로 resolve하여 정리
+            if (alertPromiseResolve) {
+                alertPromiseResolve(null);
+            }
+            alertPromiseResolve = resolve;
+
+            modal.style.display = 'flex';
+            setTimeout(() => modal.classList.add('show'), 10);
+
+            document.getElementById('alertConfirmBtn').onclick = () => {
+                alertPromiseResolve = null; // resolve 전에 참조 해제
+                modal.classList.remove('show');
+                setTimeout(() => { modal.style.display = 'none'; }, 200);
+                resolve(true);
+            };
+
+            if(cancelBtn) {
+                cancelBtn.onclick = () => {
+                    alertPromiseResolve = null;
+                    modal.classList.remove('show');
+                    setTimeout(() => { modal.style.display = 'none'; }, 200);
+                    resolve(false);
+                };
+            }
+        });
+    }
+
+    /* ── [FIX] hideAlert 함수 정의 (backdrop 클릭 시 호출됨) ── */
+    function hideAlert() {
+        const modal = document.getElementById('customAlert');
+        modal.classList.remove('show');
+        setTimeout(() => {
+            modal.style.display = 'none';
+            if (alertPromiseResolve) {
+                alertPromiseResolve(false);
+                alertPromiseResolve = null;
+            }
+        }, 200);
+    }
+
+    /* ── 4. [FIX] 수정 완료 처리 - FormData 사용 (파일 업로드 지원) ── */
+    async function handleUpdate() {
+        console.log("수정 완료 버튼 클릭됨");
+
+        const btn = document.getElementById('updateBtn');
+        const titleVal = document.getElementById('edit-title').value.trim();
+        const contentVal = document.getElementById('edit-content').value.trim();
+
+        if (!titleVal || !contentVal) {
+            await showAlert({ title: '오류', desc: '제목과 내용을 모두 입력해주세요.', confirmOnly: true });
+            return;
+        }
+
+        const ok = await showAlert({
+            title: '수정 확인',
+            desc: '변경사항을 저장하시겠습니까?',
+            icon: 'bi-question-circle'
+        });
+
+        if (ok) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 저장 중...';
+
+            try {
+                // [FIX] JSON 대신 FormData 사용 → 파일 업로드 + 텍스트 동시 전송 가능
+                const formData = new FormData();
+                formData.append('title', titleVal);
+                formData.append('content', contentVal);
+
+                // 새로 선택한 파일이 있으면 함께 전송
+                const fileInput = document.getElementById('edit-file');
+                if (fileInput.files && fileInput.files[0]) {
+                    formData.append('file', fileInput.files[0]);
+                }
+
+                const resp = await fetch(`/api/report/${REPORT_ID}/update`, {
+                    method: 'POST',
+                    // [FIX] Content-Type 헤더를 명시하지 않음 (FormData가 자동으로 multipart/form-data 설정)
+                    body: formData
+                });
+
+                const data = await resp.json();
+
+                if (data.success) {
+                    await showAlert({ title: '수정 완료', desc: '성공적으로 수정되었습니다.', confirmOnly: true });
+                    window.location.href = '/status';
+                } else {
+                    throw new Error(data.message || '저장 실패');
+                }
+            } catch (e) {
+                console.error("에러:", e);
+                await showAlert({ title: '실패', desc: '서버 저장 중 오류가 발생했습니다.', confirmOnly: true });
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-check-lg"></i> 수정 완료';
+            }
+        }
+    }
+
+    /* ── [NEW] 소프트 삭제 (DB 보존, status='삭제'로 변경) ── */
+    async function handleSoftDelete() {
+        const ok = await showAlert({
+            title: '게시글 삭제',
+            desc: '이 게시물을 삭제하시겠습니까?\n삭제 후에는 목록에서 사라집니다.',
+            icon: 'bi-trash3'
+        });
+
+        if (ok) {
+            try {
+                const resp = await fetch(`/api/report/${REPORT_ID}/soft-delete`, {
+                    method: 'POST'
+                });
+                const data = await resp.json();
+
+                if (data.success) {
+                    await showAlert({ title: '삭제 완료', desc: '게시물이 삭제되었습니다.', confirmOnly: true });
+                    window.location.href = '/status';
+                } else {
+                    await showAlert({ title: '실패', desc: data.message || '삭제에 실패했습니다.', confirmOnly: true });
+                }
+            } catch (err) {
+                console.error("삭제 오류:", err);
+                await showAlert({ title: '오류', desc: '서버 통신 중 오류가 발생했습니다.', confirmOnly: true });
+            }
+        }
+    }
+
+
+    /* ── 카카오 지도 ── */
+    window.onload = () => {
+        try {
+            const lat = parseFloat('{{ detail.lat or 37.5665 }}');
+            const lng = parseFloat('{{ detail.lng or 126.9780 }}');
+            const mapOption = { center: new kakao.maps.LatLng(lat, lng), level: 3 };
+            const map = new kakao.maps.Map(document.getElementById('edit-map'), mapOption);
+            new kakao.maps.Marker({ position: new kakao.maps.LatLng(lat, lng) }).setMap(map);
+        } catch (e) {
+            console.log("지도 로드 실패:", e);
+        }
+    };
+</script>
+{% endblock %}

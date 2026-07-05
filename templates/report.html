@@ -1,0 +1,899 @@
+﻿{% extends 'layout.html' %}
+
+{% block title %}Report - Crack{% endblock %}
+
+{% block content %}
+<!-- h2 포트홀 사진 또는 영상을 찍어 신고해주세요 삭제-->
+<!-- 로컬 공지 모달 제거 (layout.html 전역 모달 사용) -->
+
+<div class="report-form card" style="margin-bottom: 24px;">
+    <!--제목div 위로 올림-->
+    <div class="form-group" style="margin-bottom: 20px;">
+        <label style="display: block; font-size: 0.9rem; font-weight: 600; margin-bottom: 8px;">제목</label>
+        <input type="text" id="report-title" placeholder="신고 제목을 입력해주세요" maxlength="30"
+            style="width: 100%; padding: 12px; border: 1px solid rgba(0,0,0,0.1); border-radius: 12px; font-size: 0.9rem; font-family: inherit;">
+    </div>
+
+    <!-- 버그 수정: 글로벌 모달 제거하고 무조건 file-input 강제 클릭 (os 창 딱 1회만 호출) -->
+    <div class="upload-area" id="upload-area-box" onclick="triggerFileInput()"
+        style="border: 2px dashed rgba(255,140,0, 0.4); border-radius: 20px; text-align: center; margin-bottom: 24px; cursor: pointer; transition: background 0.2s; aspect-ratio: 16 / 9; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; position: relative; overflow: hidden;">
+
+        <div id="upload-placeholder"
+            style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;">
+            <i class="bi bi-camera-fill" style="font-size: 3rem; color: var(--point-orange); margin-bottom: 10px;"></i>
+            <p id="selected-file-name" style="margin-top: 12px; font-weight: 700; font-size: 1.1rem;">현장 사진 촬영 또는 첨부</p>
+            <span style="font-size: 0.8rem; opacity: 0.6;">포트홀이 잘 보이도록 가까이서 찍어주세요.</span>
+        </div>
+
+        <!-- 크롭 컨테이너 (꽉 차게 조정) / 클릭 시 사진 재선택 가능하도록 함 -->
+        <div id="crop-container" onclick="triggerFileInput()"
+            style="display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; cursor: pointer;">
+            <img id="crop-image" src="" style="display: block; width: 100%; height: 100%;">
+        </div>
+
+        <!-- 최종 렌더링 화면 -->
+        <img id="final-preview-image" src="" style="display: none; width: 100%; height: 100%; object-fit: cover;">
+    </div>
+
+    <!-- 크롭 조작 메뉴 -->
+    <div id="crop-controls" style="display: none; margin-bottom: 24px; gap: 10px; width: 100%;">
+        <button type="button" class="btn-auth-solid"
+            style="flex: 1; padding: 12px; font-size: 0.9rem; background: #5c5cff; border: none; display: flex; align-items: center; justify-content: center; gap: 6px;"
+            onclick="openCropModal()">
+            <i class="bi bi-scissors"></i> 사진 자르기
+        </button>
+        <button type="button" class="btn-auth-outline"
+            style="flex: 1; padding: 12px; font-size: 0.9rem; color: #ef4444; border-color: #ef4444; display: flex; align-items: center; justify-content: center; gap: 6px;"
+            onclick="removeImage()">
+            <i class="bi bi-trash3-fill"></i> 첨부파일 삭제
+        </button>
+    </div>
+
+    <!-- Hidden Inputs (단일화) / capture="camera" 추가로 직접 촬영 유도 -->
+    <input type="file" id="file-input" accept="image/*,video/*" capture="camera" style="display: none;"
+        onchange="handleFileSelection(this)">
+
+
+    <div class="form-group" style="margin-bottom: 20px;">
+        <label style="display: block; font-size: 0.9rem; font-weight: 600; margin-bottom: 8px;">위치 설정</label>
+
+        <!-- 초기 노출되는 직접 위치 설정 버튼 -->
+        <div id="location-guide-msg"
+            style="padding: 12px; background: rgba(255, 140, 0, 0.05); border: 1px solid rgba(255, 140, 0, 0.2); border-radius: 12px; margin-bottom: 12px; font-size: 0.85rem; color: var(--point-orange); font-weight: 600; display: flex; align-items: center; gap: 8px; line-height: 1.4;">
+            <i class="bi bi-info-circle-fill" style="font-size: 1.1rem; flex-shrink: 0;"></i>
+            <span>사진/영상을 첨부하면 위치 설정 지도가 활성화됩니다.</span>
+        </div>
+
+        <!-- 초기 노출되는 직접 위치 설정 버튼 -->
+        <button type="button" id="btn-manual-location"
+            style="width: 100%; padding: 14px; border: 2px dashed var(--point-orange); border-radius: 12px; background: white; color: var(--point-orange); font-size: 1rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;"
+            onclick="activateMapManually()">
+            <i class="bi bi-geo-alt-fill"></i> 직접 위치 설정하기
+        </button>
+
+        <!-- 위치 입력창 및 도구 (초기 숨김) -->
+        <div id="location-input-group" style="display: none; gap: 10px;">
+            <input type="text" id="report-location-text" placeholder="주소 검색 또는 지도에 핀 지정" readonly
+                style="flex: 1; padding: 12px; border: 1px solid rgba(0,0,0,0.1); border-radius: 12px; font-size: 0.9rem; font-family: inherit; background: #fafafa; cursor: pointer;">
+            <button type="button" id="btn-my-location" class="btn-auth-outline"
+                style="padding: 12px; display:flex; align-items:center; justify-content:center;" title="내 위치 찾기">
+                <i class="bi bi-crosshair"></i>
+            </button>
+        </div>
+
+        <!-- 좌표 저장용 (hidden) -->
+        <input type="hidden" id="report-lat">
+        <input type="hidden" id="report-lng">
+        <input type="hidden" id="report-address">
+
+        <!-- 지도 영역 (초기 숨김) -->
+        <div id="map-interaction-area" style="display: none;">
+            <!-- [추가] EXIF 추출 성공 알림 영역 -->
+            <div id="exif-success-msg"
+                style="display: none; padding: 12px; background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 12px; margin-bottom: 12px; font-size: 0.85rem; color: #2e7d32; font-weight: 600; align-items: flex-start; gap: 8px; line-height: 1.4;">
+                <i class="bi bi-check-circle-fill" style="font-size: 1.1rem; flex-shrink: 0; margin-top: 2px;"></i>
+                <span id="exif-success-text">사진 위치(메타데이터)가 확인되어 적용되었습니다.</span>
+            </div>
+
+            <div id="map"
+                style="margin-top: 12px; height: 220px; border-radius: 16px; border: 1px solid rgba(0,0,0,0.1); overflow: hidden; position: relative; z-index: 1;">
+                <div id="gps-status-badge"
+                    style="display: none; align-items: center; gap: 8px; font-size: 0.85rem; color: #E65100; background: #FFF3E0; padding: 10px 14px; border-radius: 12px; font-weight: 700; position: absolute; top: 12px; left: 12px; z-index: 10;">
+                    <i class="bi bi-geo-alt-fill"></i>
+                    <span id="gps-status-text">내 위치 찾는 중...</span>
+                </div>
+            </div>
+            <p style="font-size: 0.75rem; color: var(--point-orange); margin-top: 6px; font-weight: 600;">
+                <i class="bi bi-info-circle"></i> 지도를 터치하여 정확한 위치를 선택할 수 있습니다.
+            </p>
+        </div>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 15px;">
+        <label style="display: block; font-size: 0.9rem; font-weight: 600; margin-bottom:8px;">추가 설명</label>
+        <textarea id="report-content" rows="1" placeholder="상황에 대한 상세 내용을 적어주세요 (선택)"
+            style="width: 100%; padding: 12px; border: 1px solid rgba(0,0,0,0.1); border-radius: 12px; font-size: 0.9rem; resize: none; font-family: inherit;"></textarea>
+    </div>
+
+    <button type="button" id="submit-btn" class="btn-auth-solid"
+        style="width: 100%; box-shadow: 0 4px 14px rgba(255,140,0,0.3); font-size: 1rem; padding: 14px; border: none; cursor: pointer;"
+        onclick="submitReport()">
+        신고 제출하기
+    </button>
+</div>
+
+<!-- [추가] 전용 크롭 모달 (최상위 계층으로 독립 배치) -->
+<div id="cropModal"
+    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 100000; align-items: center; justify-content: center; padding: 15px; pointer-events: auto;">
+    <div
+        style="width: 100%; max-width: 500px; background: white; border-radius: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); overflow: hidden; display: flex; flex-direction: column; max-height: 85vh; position: relative;">
+        <div
+            style="padding: 18px 24px; border-bottom: 1px solid rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="font-size: 1.1rem; font-weight: 700; margin: 0; color: #333;">사진 편집</h3>
+            <button type="button" onclick="closeCropModal()"
+                style="border: none; background: none; font-size: 1.8rem; line-height: 1; cursor: pointer; color: #999; padding: 0;">&times;</button>
+        </div>
+        <div
+            style="flex: 1; background: #000; display: flex; align-items: center; justify-content: center; min-height: 280px; max-height: 55vh; overflow: hidden; position: relative;">
+            <img id="modal-crop-image" style="max-width: 100%; display: block;" alt="crop preview">
+        </div>
+        <div style="padding: 20px 24px; display: flex; gap: 12px; background: #fff;">
+            <button type="button" class="btn-auth-outline"
+                style="flex: 1; padding: 14px; border-radius: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center; text-align: center;"
+                onclick="closeCropModal()">취소</button>
+            <button type="button" class="btn-auth-solid"
+                style="flex: 1; padding: 14px; background: var(--point-orange); border-radius: 14px; font-weight: 600; border: none; color: white; display: flex; align-items: center; justify-content: center; text-align: center;"
+                onclick="confirmCrop()">적용하기</button>
+        </div>
+    </div>
+</div>
+
+<!-- 기존 불필요했던 히든 인풋 제거 -->
+
+{% block extra_style %}
+<style>
+    /* [교정] 신고 탭에서는 브라우저 기본 PTR 및 스크롤 바운스 완전 차단 */
+    main {
+        overscroll-behavior-y: contain !important;
+    }
+
+    /* [고도화] 크로퍼 UI 커스텀 (모바일 터치 편의성 및 테마 통일) */
+    .cropper-point {
+        width: 12px !important;
+        height: 12px !important;
+        background-color: var(--point-orange) !important;
+        opacity: 0.9 !important;
+        border-radius: 50%;
+    }
+
+    .cropper-line,
+    .cropper-point.point-se::before {
+        background-color: var(--point-orange) !important;
+    }
+
+    .cropper-view-box {
+        outline: 2px solid var(--point-orange) !important;
+    }
+</style>
+{% endblock %}
+
+
+<script>
+    console.log('[Report] Loaded Version: 1.3.0');
+    // 사용자 명시적 지도 활성화 함수
+    function activateMapManually() {
+        console.log('[Map] Manual activation requested');
+        // [수정] 직접 버튼 누를 때만 지도 묶음 노출
+        document.getElementById('btn-manual-location').style.display = 'none';
+        document.getElementById('location-input-group').style.display = 'flex';
+        document.getElementById('map-interaction-area').style.display = 'block';
+
+        document.getElementById('report-location-text').onclick = function () { openAddressSearch(); };
+        document.getElementById('btn-my-location').onclick = function () { getCurrentLocation(); };
+
+        // [보강] 지도가 아직 초기화 안 된 경우를 대비하여 ensureMapReady 호출
+        ensureMapReady(function () {
+            console.log('[Map] Ready after manual activation');
+            if (window.map) {
+                map.relayout();
+                // 핀이 아직 없다면 기본 위치로 설정
+                const center = map.getCenter();
+                updateMarkerOnly(center.getLat(), center.getLng(), true);
+            }
+        });
+    }
+
+    // showNoticeModal, hideNoticeModal은 layout.html 전역 함수 사용
+
+    // --- 1. 파일 첨부 버그 수정 및 EXIF 제어 추가 ---
+    function restoreMapState() {
+        // [수정] 수동 위치 설정 상태로 UI 초기화
+        document.getElementById('btn-manual-location').style.display = 'flex';
+        document.getElementById('location-input-group').style.display = 'none';
+        document.getElementById('map-interaction-area').style.display = 'none';
+        document.getElementById('location-guide-msg').style.display = 'flex';
+
+        document.getElementById('report-lat').value = "";
+        document.getElementById('report-lng').value = "";
+        document.getElementById('report-address').value = "";
+        document.getElementById('report-location-text').value = "";
+    }
+
+    // 오직 박스 클릭 시 이 함수만 실행되어 OS 기본 창 통일
+    function triggerFileInput() {
+        document.getElementById('file-input').click();
+    }
+
+    function validateFileSize(input) {
+        if (input.files && input.files[0]) {
+            const fileSize = input.files[0].size; // In bytes
+            const maxSize = 100 * 1024 * 1024; // 100MB
+            if (fileSize > maxSize) {
+                if (typeof showToast === 'function') showToast('파일 용량이 너무 큽니다 (최대 100MB)');
+                else alert('파일 용량이 너무 큽니다 (최대 100MB)');
+                input.value = ""; // Clear selection
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // 글로벌 범위에서 크로퍼 인스턴스 관리 (SPA 재진입 시 상태 유지/초기화 대응)
+    if (typeof window.cropper === 'undefined') window.cropper = null;
+    var selectedFile = null;
+
+
+
+
+    function handleFileSelection(input) {
+        if (!validateFileSize(input)) return;
+        if (!input.files || !input.files[0]) return;
+
+        const originalFile = input.files[0];
+        selectedFile = originalFile;
+        originalFileForGPS = originalFile; // [핵심] 원본 파일 참조를 별도 변수에 보관
+        gpsExtractionDone = false; // 새 파일 선택 시 GPS 추출 상태 초기화
+
+        const fileNameDisplay = document.getElementById('selected-file-name');
+        const isVideo = originalFile.type.startsWith('video/') || /\.(mp4|mov|avi|wmv|mkv)$/i.test(originalFile.name);
+        if (fileNameDisplay) {
+            // [수정] 동영상은 파일명 대신 안내 문구, 이미지만 파일명 표시
+            fileNameDisplay.innerText = isVideo ? '동영상이 첨부되었습니다' : originalFile.name;
+            fileNameDisplay.style.color = "var(--point-orange)";
+        }
+
+        // [추가] 새 파일 선택 시 기존 위치 정보 초기화 (EXIF 우선순위 보장)
+        document.getElementById('report-lat').value = "";
+        document.getElementById('report-lng').value = "";
+        document.getElementById('report-address').value = "";
+        document.getElementById('report-location-text').value = "";
+
+        // 1. 사진(image/* 또는 HEIC 확장자)인 경우
+        const isImg = originalFile.type.startsWith('image/') || /\.(heic|heif|jpg|jpeg|png|gif)$/i.test(originalFile.name);
+        if (isImg) {
+            console.log("[File] Image selection detected:", originalFile.name);
+
+            // [사용자 요청] 항상 수동 지도 활성화
+            activateMapManually();
+
+            // 미리보기 로드 (Cropper) - GPS 추출과 병렬 진행
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const img = document.getElementById('crop-image');
+                img.src = e.target.result;
+                document.getElementById('crop-container').style.display = "block";
+                document.getElementById('crop-controls').style.display = "flex";
+
+                img.onload = function () {
+                    if (window.cropper) { window.cropper.destroy(); window.cropper = null; }
+                    window.cropper = new Cropper(img, {
+                        viewMode: 3,
+                        dragMode: 'move',
+                        aspectRatio: 16 / 9,
+                        autoCropArea: 1,
+                        restore: false,
+                        guides: true,
+                        center: true,
+                        highlight: false,
+                        cropBoxMovable: true,
+                        cropBoxResizable: true,
+                        toggleDragModeOnDblclick: false,
+                        background: false
+                    });
+                };
+            };
+            reader.readAsDataURL(originalFile);
+
+        }
+        // 2. 영상(video/* 또는 MP4/MOV 확장자)인 경우
+        const isVid = originalFile.type.startsWith('video/') || /\.(mp4|mov|avi|wmv|mkv)$/i.test(originalFile.name);
+        if (isVid) {
+            console.log("[File] Video selection detected:", originalFile.name);
+            // [사용자 요청] 동영상도 항상 수동 지도 활성화
+            activateMapManually();
+            // [수정] 동영상은 삭제 버튼만 표시하고 사진 자르기 버튼은 숨김
+            document.getElementById('crop-controls').style.display = "flex";
+            const cropBtns = document.querySelectorAll('#crop-controls button');
+            if (cropBtns[0]) cropBtns[0].style.display = 'none'; // 사진 자르기 숨김
+            if (cropBtns[1]) cropBtns[1].style.flex = '1';       // 삭제 버튼 전체 너비
+
+            const previewImg = document.getElementById('final-preview-image');
+            previewImg.style.display = "block";
+            previewImg.src = ""; // 초기화
+
+            // 동영상 첫 프레임 썸네일 추출
+            const video = document.createElement('video');
+            video.src = URL.createObjectURL(originalFile);
+            video.preload = 'metadata';
+            video.muted = true;
+            video.playsInline = true;
+
+            video.onloadeddata = function () {
+                video.currentTime = 0.1;
+            };
+            video.onseeked = function () {
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                previewImg.src = canvas.toDataURL('image/jpeg');
+                URL.revokeObjectURL(video.src);
+                // 플레이스홀더 숨기고 썸네일 표시
+                document.getElementById('upload-placeholder').style.display = 'none';
+            };
+        }
+        // 3. 기타 파일
+        else if (!isImg && !isVid) {
+            document.getElementById('upload-placeholder').style.display = "flex";
+            restoreMapState();
+        }
+    }
+
+
+
+    // [추가] 크롭 모달 열기
+    function openCropModal() {
+        if (!selectedFile) return;
+        const modal = document.getElementById('cropModal');
+        const modalImg = document.getElementById('modal-crop-image');
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            modalImg.src = e.target.result;
+            if (window.cropper) { window.cropper.destroy(); window.cropper = null; }
+            window.cropper = new Cropper(modalImg, {
+                viewMode: 1, dragMode: 'move', aspectRatio: 16 / 9,
+                autoCropArea: 0.8, restore: false, guides: true, center: true,
+                highlight: false, cropBoxMovable: true, cropBoxResizable: true,
+                toggleDragModeOnDblclick: false, background: false
+            });
+        };
+        reader.readAsDataURL(selectedFile);
+    }
+
+    // [추가] 크롭 모달 닫기
+    function closeCropModal() {
+        document.getElementById('cropModal').style.display = 'none';
+        document.body.style.overflow = '';
+        if (window.cropper) { window.cropper.destroy(); window.cropper = null; }
+    }
+
+    // [추가] 크롭 적용하기
+    function confirmCrop() {
+        if (!window.cropper) return;
+        const canvas = window.cropper.getCroppedCanvas({ maxWidth: 1600, maxHeight: 900, imageSmoothingQuality: 'high' });
+        if (canvas) {
+            const previewImg = document.getElementById('final-preview-image');
+            previewImg.src = canvas.toDataURL('image/jpeg', 0.9);
+            canvas.toBlob((blob) => {
+                const ext = selectedFile.name.split('.').pop();
+                const croppedFile = new File([blob], 'cropped_' + Date.now() + '.' + ext, { type: 'image/jpeg' });
+                selectedFile = croppedFile;
+            }, 'image/jpeg', 0.9);
+            if (typeof showToastMsg === 'function') showToastMsg('사진이 성공적으로 편집되었습니다.');
+            closeCropModal();
+        }
+    }
+
+    // [추가] 이미지 삭제
+    function removeImage() {
+        if (typeof showToastMsg === 'function') showToastMsg('이미지가 삭제되었습니다.');
+        cancelCrop();
+    }
+
+    // 자르기 완료 함수 (사용자 요청으로 제거: 제출 시 자동 처리)
+    function finishCrop() {
+        console.log("finishCrop is now automated via submission.");
+    }
+
+    // 크롭 취소 (초기화)
+    function cancelCrop() {
+        if (window.cropper) { window.cropper.destroy(); window.cropper = null; }
+        selectedFile = null;
+        document.getElementById('crop-container').style.display = "none";
+        document.getElementById('crop-controls').style.display = "none";
+        document.getElementById('final-preview-image').style.display = "none";
+        document.getElementById('upload-placeholder').style.display = "flex";
+        document.getElementById('selected-file-name').innerText = "사진/영상 첨부 또는 직접 촬영";
+        document.getElementById('selected-file-name').style.color = "inherit";
+        restoreMapState();
+    }
+
+    function getCroppedBlob() {
+        return new Promise(function (resolve) {
+            if (!window.cropper) {
+                // cropper가 없거나 비디오인 경우 selectedFile 사용
+                if (selectedFile && selectedFile.size > 0) {
+                    console.log('[getCroppedBlob] No active cropper. Using selected file:', selectedFile.name);
+                    resolve(selectedFile);
+                } else {
+                    console.error('[getCroppedBlob] No file available!');
+                    resolve(null);
+                }
+                return;
+            }
+
+            try {
+                // 모바일 메모리 한계를 고려하여 최대 크기 제한 (2000px)
+                var canvas = window.cropper.getCroppedCanvas({
+                    maxWidth: 2000,
+                    maxHeight: 2000,
+                    imageSmoothingQuality: 'high'
+                });
+
+                if (!canvas) {
+                    console.warn('[getCroppedBlob] Canvas creation failed. Falling back to original.');
+                    resolve(selectedFile);
+                    return;
+                }
+
+                canvas.toBlob(function (blob) {
+                    if (!blob) {
+                        console.warn('[getCroppedBlob] toBlob failed. Falling back to original.');
+                        resolve(selectedFile);
+                        return;
+                    }
+                    var ext = (selectedFile && selectedFile.name) ? selectedFile.name.split('.').pop() : 'jpg';
+                    var file = new File([blob], 'cropped_' + Date.now() + '.' + ext, { type: 'image/jpeg' });
+                    console.log('[getCroppedBlob] Success:', file.size, 'bytes');
+                    resolve(file);
+                }, 'image/jpeg', 0.9);
+            } catch (e) {
+                console.error('[getCroppedBlob] Error during cropping:', e);
+                resolve(selectedFile); // 에러 발생 시 원본이라도 전송 시도
+            }
+        });
+    }
+
+    async function submitReport() {
+    const title = document.getElementById('report-title')?.value || '';
+    const content = document.getElementById('report-content')?.value || '';
+    const lat = document.getElementById('report-lat')?.value || '';
+    const lng = document.getElementById('report-lng')?.value || '';
+    const address = document.getElementById('report-address')?.value || '';
+
+    // [필수 벨리데이션] 주소 정보 확인
+    if (!lat || !lng || !address || address === '주소 정보 없음') {
+        showNoticeModal('상세 위치 정보(주소)가 확인되지 않았습니다. 지도를 직접 터치하여 핀을 꽂거나 주소를 검색해 주세요.');
+        return;
+    }
+
+    const formData = new FormData();
+    // 제목이 없을 경우 자동 생성 로직 추가 (선택사항)
+    const finalTitle = title.trim() === '' ? '도로 파손 신고' : title;
+
+    formData.append('title', finalTitle);
+    formData.append('content', content);
+    formData.append('latitude', lat);
+    formData.append('longitude', lng);
+    formData.append('address', address);
+
+    // 사진/영상 파일 처리
+    if (selectedFile && selectedFile.size > 0) {
+        showToastMsg('파일 확인 중...');
+
+        // ⭐ 중요: 크롭된 사진이 있다면 가져오고, 없으면 원본(selectedFile)을 사용합니다.
+        const finalFile = await getCroppedBlob();
+
+        if (!finalFile || finalFile.size === 0) {
+            showToastMsg('파일 처리에 실패했습니다. 다시 첨부해주세요.');
+            return;
+        }
+
+        // 'file'이라는 키값으로 서버에 전송 (서버에서 이 키값으로 사진을 저장함)
+        formData.append('file', finalFile);
+    } else {
+        showToastMsg('사진이나 영상을 먼저 첨부해주세요.');
+        return;
+    }
+
+    const submitBtn = document.getElementById('submit-btn');
+    if (submitBtn) submitBtn.disabled = true;
+
+    // 로딩창 활성화
+    if (typeof showPremiumLoader === 'function') {
+        showPremiumLoader('파일을 업로드하고 있습니다...\n화면을 벗어나지 마세요.');
+    }
+
+    try {
+        const response = await fetch('/api/report', {
+            method: 'POST',
+            body: formData
+        });
+        const result = await response.json();
+
+        if (result.success) {
+            if (typeof showPremiumLoader === 'function') {
+                showPremiumLoader('업로드 완료! AI 분석을 시작합니다...');
+            }
+            showToastMsg('제보가 접수되었습니다!');
+
+            // 1초 후 신고 현황 페이지로 이동 (사진이 잘 올라갔는지 바로 확인 가능)
+            setTimeout(() => {
+                window.location.href = '/status';
+            }, 1000);
+        } else {
+            if (typeof hidePremiumLoader === 'function') hidePremiumLoader();
+            showToastMsg('제출 실패: ' + result.message);
+            if (submitBtn) submitBtn.disabled = false;
+        }
+    } catch (error) {
+        if (typeof hidePremiumLoader === 'function') hidePremiumLoader();
+        showToastMsg('서버 연결 오류');
+        console.error('Submit Error:', error);
+        if (submitBtn) submitBtn.disabled = false;
+    }
+}
+    function showToastMsg(msg) {
+        if (typeof showToast === 'function') showToast(msg);
+        else alert(msg);
+    }
+
+    // --- 지도 연동 (Kakao Map API) ---
+    var map = null;
+    var marker = null;
+    var geocoder = null;
+    var defaultLat = 37.5665; // 기본: 서울 시청
+    var defaultLng = 126.9780;
+
+    function initMap() {
+        document.getElementById('map').style.height = "220px";
+        const mapContainer = document.getElementById('map');
+
+        mapContainer.innerHTML = ''; // 중복 방지
+        const mapOption = {
+            center: new kakao.maps.LatLng(defaultLat, defaultLng),
+            level: 3
+        };
+
+        map = new kakao.maps.Map(mapContainer, mapOption);
+        geocoder = new kakao.maps.services.Geocoder();
+
+        // 초기 마커
+        marker = new kakao.maps.Marker({
+            position: new kakao.maps.LatLng(defaultLat, defaultLng),
+            map: map,
+            draggable: true // 마커를 드래그 가능하게 설정
+        });
+
+        // 마커 드래그 종료 이벤트
+        kakao.maps.event.addListener(marker, 'dragend', function () {
+            const latlng = marker.getPosition();
+            const lat = latlng.getLat();
+            const lng = latlng.getLng();
+            updateMarkerOnly(lat, lng);
+            reverseGeocode(lat, lng);
+        });
+
+        // SPA 대응 릴레이아웃 (중요: 지도가 생성된 직후와 투입된 직후 여러번 수행)
+        const fixMap = () => {
+            if (map) {
+                map.relayout();
+                map.setCenter(new kakao.maps.LatLng(defaultLat, defaultLng));
+            }
+        };
+        setTimeout(fixMap, 100);
+        setTimeout(fixMap, 500);
+        setTimeout(fixMap, 1000);
+
+        // 지도 클릭 시 마커 이동 및 역지오코딩
+        kakao.maps.event.addListener(map, 'click', function (mouseEvent) {
+            const latlng = mouseEvent.latLng;
+            const lat = latlng.getLat();
+            const lng = latlng.getLng();
+
+            console.log('[Map] Clicked at:', lat, lng);
+
+            // [추가] 사용자가 지도를 직접 찍으면 메타데이터 안내 메시지를 숨김 (방어 코드)
+            const exifMsg = document.getElementById('exif-success-msg');
+            if (exifMsg) exifMsg.style.display = 'none';
+
+            updateMarkerOnly(lat, lng);
+            reverseGeocode(lat, lng);
+        });
+
+        // SPA 대응 릴레이아웃 (지연)
+        setTimeout(() => {
+            if (map) map.relayout();
+            map.setCenter(new kakao.maps.LatLng(defaultLat, defaultLng));
+        }, 300);
+
+        // 초기 위치 시도 (제거됨: 사용자가 명시적으로 활성화할 때 위치권한 요구)
+    }
+
+    function updateMarkerOnly(lat, lng, moveMap = false) {
+        const moveLatLon = new kakao.maps.LatLng(lat, lng);
+        if (marker) {
+            marker.setPosition(moveLatLon);
+            if (moveMap && map) {
+                map.panTo(moveLatLon);
+            }
+        }
+        document.getElementById('report-lat').value = lat;
+        document.getElementById('report-lng').value = lng;
+    }
+
+    function updateMarkerAndText(lat, lng, addressText, moveMap = false) {
+        updateMarkerOnly(lat, lng, moveMap);
+        document.getElementById('report-location-text').value = addressText;
+    }
+
+    // 지도가 아직 초기화되지 않은 경우 SDK를 확인하고 초기화하는 헬퍼
+    function ensureMapReady(callback) {
+        if (map && geocoder) {
+            if (callback) callback();
+            return;
+        }
+
+        // window 객체에 SDK 로드 상태 확인 (layout.html에서 관리됨)
+        if (typeof kakao === 'undefined' || !kakao.maps) {
+            console.log("Waiting for Kakao Maps SDK...");
+            setTimeout(function () { ensureMapReady(callback); }, 200);
+            return;
+        }
+
+        // SDK가 로드된 경우 (스크립트가 이미 헤더에 존재하므로 load만 호출)
+        kakao.maps.load(function () {
+            // services 라이브러리가 로드되었는지 추가 확인 
+            if (!kakao.maps.services) {
+                console.log("Waiting for Kakao Maps Services...");
+                setTimeout(function () { ensureMapReady(callback); }, 200);
+                return;
+            }
+
+            console.log("Kakao Maps SDK & Services Loaded. Initializing...");
+            if (!map) initMap();
+            if (callback) setTimeout(callback, 200);
+        });
+    }
+
+    function getCurrentLocation() {
+        if (navigator.geolocation) {
+            showToastMsg("현재 위치를 가져오는 중...");
+            navigator.geolocation.getCurrentPosition(
+                function (pos) {
+                    const lat = pos.coords.latitude;
+                    const lng = pos.coords.longitude;
+                    // 지도가 아직 없으면 먼저 초기화 후 위치 설정
+                    ensureMapReady(function () {
+                        updateMarkerOnly(lat, lng, true);
+                        reverseGeocode(lat, lng);
+                    });
+                },
+                function (err) {
+                    console.log("위치 가져오기 실패, 기본 좌표 사용");
+                    showToastMsg("위치 권한이 거부되었거나 실패했습니다.");
+                    ensureMapReady(function () {
+                        updateMarkerAndText(defaultLat, defaultLng, "위치를 불러올 수 없습니다.");
+                    });
+                },
+                { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+            );
+        } else {
+            showToastMsg("이 브라우저에서는 위치 서비스를 지원하지 않습니다.");
+        }
+    }
+
+    // --- 주소 API (Daum) 및 Kakao Geocoding 연동 ---
+    function openAddressSearch() {
+        if (typeof daum === 'undefined' || !daum.Postcode) {
+            showToastMsg("주소 검색 스크립트를 불러올 수 없습니다.");
+            return;
+        }
+        new daum.Postcode({
+            oncomplete: function (data) {
+                let fullAddr = data.roadAddress || data.jibunAddress;
+                document.getElementById('report-address').value = fullAddr;
+                geocodeAddress(fullAddr);
+            }
+        }).open();
+    }
+
+    // 주소 -> 좌표 
+    function geocodeAddress(address) {
+        showToastMsg("좌표 변환 중...");
+        if (!geocoder) {
+            return;
+        }
+        geocoder.addressSearch(address, function (result, status) {
+            if (status === kakao.maps.services.Status.OK) {
+                const lat = result[0].y;
+                const lng = result[0].x;
+                updateMarkerAndText(lat, lng, address, true);
+            } else {
+                showToastMsg("해당 주소의 정밀 좌표를 찾을 수 없습니다.");
+                document.getElementById('report-location-text').value = address;
+            }
+        });
+    }
+
+    // 좌표 -> 주소 
+    function reverseGeocode(lat, lng) {
+        // 숫자가 아닌 값이 들어왔을 경우 방어
+        const nLat = Number(lat);
+        const nLng = Number(lng);
+
+        if (isNaN(nLat) || isNaN(nLng)) {
+            console.error("[GPS] Invalid coordinates:", lat, lng);
+            document.getElementById('report-location-text').value = "직접 위치를 설정해주세요.";
+            return;
+        }
+
+        const coordAddr = `${nLat.toFixed(5)}, ${nLng.toFixed(5)}`;
+        document.getElementById('report-location-text').value = "주소 변환 중...";
+        document.getElementById('report-address').value = coordAddr; // 기본값으로 좌표 미리 설정 (제출 차단 방지)
+
+        ensureMapReady(function () {
+            if (!geocoder) {
+                geocoder = new kakao.maps.services.Geocoder();
+            }
+
+            const latlng = new kakao.maps.LatLng(nLat, nLng);
+            geocoder.coord2Address(latlng.getLng(), latlng.getLat(), function (result, status) {
+                if (status === kakao.maps.services.Status.OK) {
+                    let detailAddr = !!result[0].road_address ? result[0].road_address.address_name : result[0].address.address_name;
+
+                    // 핵심 수정: input 및 hidden 필드 확실하게 업데이트
+                    document.getElementById('report-location-text').value = detailAddr;
+                    document.getElementById('report-address').value = detailAddr;
+
+                    // [추가] EXIF 성공 메시지가 켜져있는 경우 주소를 상세히 업데이트
+                    const exifMsg = document.getElementById('exif-success-msg');
+                    const exifText = document.getElementById('exif-success-text');
+                    if (exifMsg && exifMsg.style.display !== 'none' && exifText) {
+                        exifText.innerHTML = `사진 위치(메타데이터) 적용:<br><span style="font-size: 0.95rem; color: #1B5E20; display: block; margin-top: 4px;">${detailAddr}</span>`;
+
+                        // 사용자가 주소를 명확히 인지할 수 있도록 입력창 묶음을 강제로 다시 노출
+                        document.getElementById('location-input-group').style.display = 'flex';
+                        // 단, 입력창의 클릭(지도열기) 이벤트를 막아 수정 혼선을 방지 (선택적)
+                        document.getElementById('report-location-text').style.cursor = 'default';
+                        document.getElementById('report-location-text').onclick = null;
+                        document.getElementById('report-location-text').style.background = '#e8f5e9'; // 녹색 배경
+                        document.getElementById('report-location-text').style.borderColor = '#c8e6c9';
+                        document.getElementById('report-location-text').style.color = '#2e7d32';
+                        document.getElementById('report-location-text').style.fontWeight = '700';
+
+                        // 내 위치 버튼은 숨김 (메타데이터가 우선하므로)
+                        document.getElementById('btn-my-location').style.display = 'none';
+                    }
+                } else {
+                    // 변환 실패 시 좌표 그대로 유지
+                    document.getElementById('report-location-text').value = coordAddr;
+                    document.getElementById('report-address').value = coordAddr;
+
+                    const exifMsg = document.getElementById('exif-success-msg');
+                    const exifText = document.getElementById('exif-success-text');
+                    if (exifMsg && exifMsg.style.display !== 'none' && exifText) {
+                        exifText.innerHTML = `사진 위치(메타데이터) 적용:<br><span style="font-size: 0.95rem; color: #1B5E20;">${coordAddr} (도로명 변환 불가)</span>`;
+                        document.getElementById('location-input-group').style.display = 'flex';
+                    }
+                }
+            });
+        });
+    }
+
+
+    // DOM 로드 후 지도 초기화 
+    function triggerMapInit() {
+        const mapContainer = document.getElementById('map');
+        if (!mapContainer) return;
+        ensureMapReady();
+    }
+
+    // --- [핵심] 수동 GPS 바이너리 파서 (최종 수단: 삼성/안드로이드 인식률 극대화) ---
+    function extractGPSSync(buffer) {
+        try {
+            const view = new DataView(buffer);
+            if (view.byteLength < 10) return null;
+
+            // JPEG 헤더(FF D8) 확인
+            if (view.getUint16(0) !== 0xFFD8) {
+                // HEIC 등 비 JPEG 형식은 exifr에 맡김
+                return null;
+            }
+
+            let offset = 2;
+            const maxScan = Math.min(view.byteLength - 4, 256 * 1024); // 256KB까지 확장 스캔
+
+            while (offset < maxScan) {
+                const marker = view.getUint16(offset);
+                if (marker === 0xFFE1) { // APP1 - Exif
+                    const result = parseExif(view, offset + 4);
+                    if (result) return result;
+                } else if (marker === 0xFFDA) { // Start of Scan (데이터 시작점, 더 이상 마커 없음)
+                    break;
+                }
+
+                const length = view.getUint16(offset + 2);
+                offset += 2 + length;
+            }
+        } catch (e) { console.error("[ManualGPS] Scan error:", e); }
+        return null;
+    }
+
+    function parseExif(view, offset) {
+        if (view.getUint32(offset) !== 0x45786966) return null;
+        const littleEndian = view.getUint16(offset + 6) === 0x4949;
+        const ifd0Offset = offset + 6 + view.getUint32(offset + 8, littleEndian);
+        const gpsIfdOffset = findTag(view, ifd0Offset, 0x8825, littleEndian, offset + 6);
+        if (!gpsIfdOffset) return null;
+        const base = offset + 6;
+        const lat = getDegrees(view, base + gpsIfdOffset, 0x0002, littleEndian, base);
+        const latRef = getRef(view, base + gpsIfdOffset, 0x0001, littleEndian, base);
+        const lng = getDegrees(view, base + gpsIfdOffset, 0x0004, littleEndian, base);
+        const lngRef = getRef(view, base + gpsIfdOffset, 0x0003, littleEndian, base);
+        return (lat && lng) ? { lat: lat * (latRef === 'S' ? -1 : 1), lng: lng * (lngRef === 'W' ? -1 : 1) } : null;
+    }
+
+    function findTag(view, ifdOffset, targetTag, littleEndian, base) {
+        const numEntries = view.getUint16(ifdOffset, littleEndian);
+        for (let i = 0; i < numEntries; i++) {
+            const entryOffset = ifdOffset + 2 + (i * 12);
+            if (view.getUint16(entryOffset, littleEndian) === targetTag) return view.getUint32(entryOffset + 8, littleEndian);
+        }
+        return null;
+    }
+
+    function getDegrees(view, gpsIfdOffset, targetTag, littleEndian, base) {
+        const offset = findTag(view, gpsIfdOffset, targetTag, littleEndian, base);
+        if (!offset) return null;
+        const absOffset = base + offset;
+        const d = view.getUint32(absOffset, littleEndian) / view.getUint32(absOffset + 4, littleEndian);
+        const m = view.getUint32(absOffset + 8, littleEndian) / view.getUint32(absOffset + 12, littleEndian);
+        const s = view.getUint32(absOffset + 16, littleEndian) / view.getUint32(absOffset + 20, littleEndian);
+        return d + (m / 60) + (s / 3600);
+    }
+
+    function getRef(view, gpsIfdOffset, targetTag, littleEndian, base) {
+        const numEntries = view.getUint16(gpsIfdOffset, littleEndian);
+        for (let i = 0; i < numEntries; i++) {
+            const entryOffset = gpsIfdOffset + 2 + (i * 12);
+            if (view.getUint16(entryOffset, littleEndian) === targetTag) return String.fromCharCode(view.getUint8(entryOffset + 8));
+        }
+        return null;
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', triggerMapInit);
+    } else {
+        triggerMapInit();
+    }
+</script>
+
+<style>
+    /* 입력 폼 focus 효과 & 내부 맵 스타일 오버라이드 */
+    .form-group input:focus,
+    .form-group textarea:focus {
+        border-color: var(--point-orange) !important;
+        box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.1);
+    }
+
+    .leaflet-control-attribution {
+        font-size: 0px !important;
+        /* attribution 글씨 숨김처리 (선택사항) */
+        display: none;
+    }
+</style>
+{% endblock %}

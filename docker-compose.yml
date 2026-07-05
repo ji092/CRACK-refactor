@@ -1,0 +1,12 @@
+services:
+  app:
+    build: .
+    container_name: crack-app
+    ports:
+      - "8012:8012"
+    environment:
+      - FLASK_RUN_HOST=0.0.0.0
+    volumes:
+      - ./secrets:/app/secrets:ro
+      - ./uploads:/app/uploads
+    restart: unless-stopped

@@ -1,0 +1,806 @@
+{% extends 'layout.html' %}
+
+{% block title %}{{ detail.title }} - 상세 정보{% endblock %}
+
+{% block content %}
+<style>
+    /* 전역 main 패딩 제거 (상세페이지 전용) */
+    main {
+        padding: 0 !important;
+    }
+
+    .detail-container {
+        padding: 0;
+        background: #fcfcfc;
+        min-height: 100%;
+        display: flex;
+        flex-direction: column;
+        padding-bottom: 80px;
+    }
+
+    .detail-header {
+        position: sticky;
+        top: -1px;
+        z-index: 100;
+        background: #ffffff;
+        padding: 14px 20px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .back-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f5f5f5;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .back-btn:active {
+        transform: scale(0.95);
+        background: #eee;
+    }
+
+    .media-hero {
+        width: 100%;
+        aspect-ratio: 4/3;
+        background: #000;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .media-hero img,
+    .media-hero video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    /* 동영상 CV 오버레이 컨테이너 */
+    .video-cv-container {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 4/3;
+        background: #000;
+        /* 넘침 허용으로 하단 컨트롤러 가림 방지 */
+        overflow: visible;
+        border-radius: 16px;
+    }
+
+    .video-cv-container video {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        display: block;
+        border-radius: 16px;
+    }
+
+    .video-cv-container canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+    }
+
+    .status-floating {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        padding: 6px 16px;
+        border-radius: 20px;
+        font-weight: 800;
+        font-size: 0.8rem;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        z-index: 10;
+    }
+
+    .info-card {
+        margin: 10px 20px 20px 20px;
+        background: white;
+        border-radius: 24px;
+        padding: 24px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        position: relative;
+        z-index: 20;
+    }
+
+    .ai-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--accent-soft);
+        color: var(--point-orange);
+        padding: 4px 12px;
+        border-radius: 10px;
+        font-weight: 800;
+        font-size: 0.75rem;
+        margin-bottom: 12px;
+    }
+
+    .meta-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin: 20px 0;
+    }
+
+    .detail-page {
+        background: var(--bg-main);
+        padding: 12px;
+        border-radius: 16px;
+    }
+
+    .meta-label {
+        display: block;
+        font-size: 0.7rem;
+        opacity: 0.4;
+        margin-bottom: 4px;
+        font-weight: 600;
+    }
+
+    .meta-value {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: var(--text-asphalt);
+    }
+
+    #view-map {
+        width: 100%;
+        height: 200px;
+        border-radius: 20px;
+        margin-top: 16px;
+        border: 1px solid rgba(0, 0, 0, 0.03);
+    }
+
+    /* 히스토리 버튼 */
+    .history-toggle-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--point-orange);
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 14px;
+        font-weight: 700;
+        font-size: 0.85rem;
+        cursor: pointer;
+        margin-top: 16px;
+        box-shadow: 0 4px 15px rgba(255, 140, 0, 0.3);
+        transition: all 0.2s;
+    }
+
+    .history-toggle-btn:active {
+        transform: scale(0.96);
+    }
+
+    /* 히스토리 패널 */
+    .detection-history-panel {
+        display: none;
+        margin-top: 16px;
+        max-height: 300px;
+        overflow-y: auto;
+        border-radius: 16px;
+        border: 1px solid #eee;
+        background: #fafafa;
+    }
+
+    .detection-history-panel.active {
+        display: block;
+    }
+
+    .det-item {
+        padding: 12px 16px;
+        border-bottom: 1px solid #f0f0f0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+
+    .det-item:hover {
+        background: #fff3e0;
+    }
+
+    .det-item:last-child {
+        border-bottom: none;
+    }
+
+    .det-time {
+        min-width: 60px;
+        font-size: 0.8rem;
+        font-weight: 800;
+        color: #667eea;
+        font-family: 'Courier New', monospace;
+    }
+
+    .det-class {
+        flex: 1;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #333;
+    }
+
+    .det-conf {
+        font-size: 0.8rem;
+        font-weight: 800;
+        padding: 3px 10px;
+        border-radius: 10px;
+        background: rgba(255, 140, 0, 0.1);
+        color: var(--point-orange);
+    }
+
+    .det-empty {
+        padding: 30px;
+        text-align: center;
+        color: #aaa;
+        font-size: 0.9rem;
+    }
+
+    /* 상태별 배경색 클래스 분리 (린트 오류 방지) */
+    .status-floating.status-done {
+        background: #E8F5E9;
+        color: #2E7D32;
+    }
+
+    .status-floating.status-processing {
+        background: #E3F2FD;
+        color: #1E88E5;
+    }
+
+    .status-floating.status-received {
+        background: #FFF3E0;
+        color: #E65100;
+    }
+
+    .status-floating.status-rejected {
+        background: #FFEBEE;
+        color: #D32F2F;
+    }
+
+    .status-floating.status-analyzing {
+        background: #FEEBF2;
+        color: #C2185B;
+    }
+
+    .status-floating.status-default {
+        background: #ECEFF1;
+        color: #455A64;
+    }
+
+    /* [NEW] 관리자 상태 드롭다운 */
+    .status-dropdown-wrap {
+        position: relative;
+        display: inline-block;
+    }
+
+    .detail-status-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        border-radius: 12px;
+        font-weight: 800;
+        font-size: 0.8rem;
+        cursor: pointer;
+        border: none;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+
+    .detail-status-btn.status-done {
+        background: #E8F5E9;
+        color: #2E7D32;
+    }
+
+    .detail-status-btn.status-processing {
+        background: #E3F2FD;
+        color: #1E88E5;
+    }
+
+    .detail-status-btn.status-received {
+        background: #FFF3E0;
+        color: #E65100;
+    }
+
+    .detail-status-btn.status-rejected {
+        background: #FFEBEE;
+        color: #D32F2F;
+    }
+
+    .detail-status-btn.status-analyzing {
+        background: #FEEBF2;
+        color: #C2185B;
+    }
+
+    .detail-status-btn.status-default {
+        background: #ECEFF1;
+        color: #455A64;
+    }
+
+    .detail-status-btn:hover {
+        filter: brightness(0.95);
+    }
+
+    .status-dropdown-menu {
+        position: absolute;
+        top: calc(100% + 8px);
+        right: 0;
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        padding: 6px;
+        width: 140px;
+        z-index: 1000;
+        border: 1px solid #f0f0f0;
+        display: none;
+    }
+
+    .status-dropdown-menu.show {
+        display: block;
+        animation: dropFade 0.2s ease-out;
+    }
+
+    @keyframes dropFade {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .dropdown-item {
+        padding: 10px 14px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #475569;
+        cursor: pointer;
+        border-radius: 10px;
+        transition: all 0.15s;
+    }
+
+    .dropdown-item:hover {
+        background: #f8fafc;
+        color: #0f172a;
+    }
+
+    .dropdown-item.reject-item {
+        color: #ef4444;
+    }
+
+    .dropdown-item.reject-item:hover {
+        background: #fef2f2;
+    }
+</style>
+
+<!-- [SAFE-PASS] 데이터 전달을 위해 상단에 히든 필드 배치 -->
+<div id="safe-report-context" data-report-id="{{ detail.id }}" style="display:none;"></div>
+
+<div class="detail-container">
+    <div class="detail-header">
+        <a href="javascript:void(0)" onclick="history.back(); return false;" class="back-btn"
+            style="text-decoration: none; color: inherit;">
+            <i class="bi bi-chevron-left" style="font-size: 1.2rem;"></i>
+        </a>
+        <h3
+            style="margin: 0; font-size: 1.1rem; font-weight: 800; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            상세 정보</h3>
+        {# 3점 메뉴 제거 (상태 드롭다운으로 통합) #}
+    </div>
+
+{# --- 미디어 영역 시작 (권한 체크) --- #}
+    {% if is_admin %}
+        <div class="media-hero" style="position: relative;">
+            {# 상태 플로팅 배지 #}
+            <span class="status-floating
+                {% if detail.status == '처리 완료' %}status-done
+                {% elif detail.status == '신고 처리중' %}status-processing
+                {% elif detail.status == '접수완료' %}status-received
+                {% elif detail.status == '반려' %}status-rejected
+                {% elif detail.status == 'AI 분석중' %}status-analyzing
+                {% else %}status-default{% endif %}
+            ">
+                {{ detail.status }}
+            </span>
+
+            {% if detail.file_type == 'video' and detail.file_path %}
+                {# 1. 동영상인 경우 #}
+                <div class="video-cv-container" id="video-cv-container" style="width:100%; height:100%;">
+                    <video id="cv-video" poster="{{ detail.thumbnail_path }}" controls playsinline
+                        style="width:100%; height:100%; object-fit:contain;">
+                        <source src="{{ detail.file_path if detail.file_path.startswith('/') else '/uploads/' + detail.file_path }}" type="video/mp4">
+                    </video>
+                    {% if is_admin %}
+                        <canvas id="cv-canvas"></canvas>
+                    {% endif %}
+                </div>
+            {% elif detail.file_path %}
+                {# 2. 이미지인 경우 #}
+                <img src="{{ detail.file_path if detail.file_path.startswith('/') else '/uploads/' + detail.file_path }}"
+                     alt="신고 사진"
+                     style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;"
+                     onclick="openEnlargeModal(this.src)"
+                     onerror="this.onerror=null; this.src='/static/images/no-image.png';">
+            {% else %}
+                {# 3. 파일이 없는 경우 #}
+                <div style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #eee; color: #999;">
+                    <i class="bi bi-image" style="font-size: 3rem; opacity: 0.3;"></i>
+                    <p style="font-size: 0.8rem; margin-top: 10px;">등록된 파일이 없습니다.</p>
+                </div>
+            {% endif %}
+        </div>
+    {% else %}
+        {# 4. 권한이 없는 경우 #}
+        <div class="media-hero" style="background: #eee; display: flex; align-items: center; justify-content: center; color: #666; text-align: center;">
+            <div>
+                <i class="bi bi-lock-fill" style="font-size: 2.5rem; display: block; margin-bottom: 10px; opacity: 0.2;"></i>
+                <p style="font-weight: 700;">본인 또는 관리자만 볼 수 있는 제보입니다.</p>
+            </div>
+        </div>
+    {% endif %}
+    {# --- 미디어 영역 종료 --- #}
+
+    <!-- 이미지 확대 모달 -->
+    <div id="enlarge-modal" onclick="closeEnlargeModal()"
+        style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:9999; align-items:center; justify-content:center; padding:20px;">
+        <img id="enlarge-img" src=""
+            style="max-width:100%; max-height:100%; object-fit:contain; border-radius:8px; box-shadow:0 0 30px rgba(0,0,0,0.5);">
+        <button type="button"
+            style="position:absolute; top:20px; right:20px; background:none; border:none; color:white; font-size:2rem; cursor:pointer;">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </div>
+
+    <div class="info-card">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+            {% if is_admin %}
+            <div class="ai-badge" style="margin-bottom: 0;">
+                <i class="bi bi-robot"></i>
+                AI 판독: {{ detail.damage_type }} ({{ detail.confidence }}%)
+            </div>
+            {% endif %}
+
+            {% if is_admin %}
+            <div class="status-dropdown-wrap">
+                <button onclick="toggleDetailStatusDropdown(event)"
+                    class="detail-status-btn {% if detail.status == '처리 완료' %}status-done{% elif detail.status == '신고 처리중' %}status-processing{% elif detail.status == '접수완료' %}status-received{% elif detail.status == '반려' %}status-rejected{% elif detail.status == 'AI 분석중' %}status-analyzing{% else %}status-default{% endif %}">
+                    {{ detail.status }} <i class="bi bi-chevron-down" style="font-size: 0.7rem; margin-left: 2px;"></i>
+                </button>
+                <div id="detailStatusDropdown" class="status-dropdown-menu">
+                    <div onclick="updateStatusFromDetail('관리자 확인중')" class="dropdown-item" style="color:#607D8B;">관리자 확인
+                    </div>
+                    <div onclick="updateStatusFromDetail('접수완료')" class="dropdown-item">접수완료</div>
+                    <div onclick="updateStatusFromDetail('신고 처리중')" class="dropdown-item">처리중</div>
+                    <div onclick="updateStatusFromDetail('처리 완료')" class="dropdown-item" style="color:#2E7D32;">처리 완료
+                    </div>
+                    <div onclick="updateStatusFromDetail('반려')" class="dropdown-item reject-item">반려</div>
+                    <div onclick="reAnalyzeAI()" class="dropdown-item"
+                        style="border-top:1px solid #eee; color:var(--point-orange);">
+                        <i class="bi bi-robot"></i> AI 재분석
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <h2 style="font-size: 1.4rem; font-weight: 800; margin-bottom: 12px; line-height: 1.3;">{{ detail.title }}</h2>
+        <p style="font-size: 0.95rem; line-height: 1.6; opacity: 0.7; margin-bottom: 0;">{{ detail.content }}</p>
+
+        <div class="meta-grid">
+            <div class="meta-item">
+                <span class="meta-label">제보자</span>
+                <span class="meta-value">{{ detail.reporter_name }}</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">제보 시간</span>
+                <span class="meta-value" style="font-size: 0.8rem;">{{ detail.time }}</span>
+            </div>
+        </div>
+
+        {% if is_admin and detail.file_type == 'video' %}
+        <!-- 검출 히스토리 버튼 (관리자 전용) -->
+        <button class="history-toggle-btn" onclick="toggleHistory()">
+            <i class="bi bi-clock-history"></i> AI 검출 히스토리
+        </button>
+        <div class="detection-history-panel" id="history-panel">
+            <div class="det-empty" id="history-loading"><i class="bi bi-hourglass-split"></i> 검출 기록 로딩 중...</div>
+        </div>
+        {% endif %}
+
+        <div style="margin-top: 24px;">
+            <label
+                style="font-size: 0.75rem; font-weight: 800; display: flex; align-items: center; gap: 6px; color: var(--point-orange); margin-bottom: 10px;">
+                <i class="bi bi-geo-alt-fill"></i> 신고 위치
+            </label>
+            <p style="font-size: 1rem; font-weight: 700; margin: 0; margin-bottom: 12px;">{{ detail.address or '주소 정보
+                없음' }}</p>
+            <div id="view-map" style="width:100%; height:200px; border-radius:20px; background:#f0f0f0;"></div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // [BRIDGE] HTML Context에서 ID 로드
+    const SAFE_CONTEXT = document.getElementById('safe-report-context');
+    const REPORT_ID = SAFE_CONTEXT ? SAFE_CONTEXT.dataset.reportId : null;
+
+    function ensureMapReady(callback) {
+        if (window.kakaoSdkLoaded === false) {
+            console.error("[Map] SDK Load Failed");
+            return;
+        }
+
+        // [FIX] autoload=false 제거에 따른 직접 호출
+        if (typeof kakao !== 'undefined' && kakao.maps && kakao.maps.LatLng) {
+            initMapView();
+            if (callback) callback();
+        } else {
+            setTimeout(function () { ensureMapReady(callback); }, 300);
+        }
+    }
+
+    function initMapView() {
+        var latStr = '{{ detail.lat or 37.5665 }}';
+        var lngStr = '{{ detail.lng or 126.9780 }}';
+        var lat = parseFloat(latStr);
+        var lng = parseFloat(lngStr);
+
+        var mapContainer = document.getElementById('view-map');
+        if (!mapContainer) return;
+
+        console.log('[Map] Init with:', lat, lng);
+        var mapOption = { center: new kakao.maps.LatLng(lat, lng), level: 3 };
+        var map = new kakao.maps.Map(mapContainer, mapOption);
+        var marker = new kakao.maps.Marker({ position: new kakao.maps.LatLng(lat, lng) });
+        marker.setMap(map);
+
+        // 지연 레이아웃 재계산
+        setTimeout(function () {
+            if (map) {
+                map.relayout();
+                map.setCenter(new kakao.maps.LatLng(lat, lng));
+            }
+        }, 500);
+    }
+
+    // 이미지 확대 모달 관련
+    window.openEnlargeModal = function (src) {
+        var modal = document.getElementById('enlarge-modal');
+        var img = document.getElementById('enlarge-img');
+        if (modal && img) {
+            img.src = src;
+            modal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+    };
+
+    window.closeEnlargeModal = function () {
+        var modal = document.getElementById('enlarge-modal');
+        if (modal) {
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+        }
+    };
+
+    setTimeout(function () { ensureMapReady(); }, 100);
+
+    // ========================
+    // 동영상 CV 오버레이 + 히스토리
+    // ========================
+    var allDetections = [];
+    var historyLoaded = false;
+
+    {% if detail.file_type == 'video' %}
+    (function () {
+        var video = document.getElementById('cv-video');
+        if (!video || !REPORT_ID) return;
+
+        // 검출 데이터 로드 및 렌더링 루프 시작
+        fetch('/api/report/' + REPORT_ID + '/detections')
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                allDetections = data;
+                historyLoaded = true;
+                renderHistory(data);
+                startCVRenderLoop();
+                console.log('[CV] Loaded ' + data.length + ' detections');
+            })
+            .catch(function (e) { console.error('[CV] Error loading detections:', e); });
+    })();
+
+    function startCVRenderLoop() {
+        var video = document.getElementById('cv-video');
+        var canvas = document.getElementById('cv-canvas');
+        if (!video || !canvas) return;
+        var ctx = canvas.getContext('2d');
+
+        function render() {
+            if (!video.paused && !video.ended) {
+                drawDetections(video, canvas, ctx);
+            }
+            requestAnimationFrame(render);
+        }
+
+        // 비디오 상태와 무관하게 시간 이동 시에도 그림
+        video.addEventListener('timeupdate', function () {
+            drawDetections(video, canvas, ctx);
+        });
+
+        requestAnimationFrame(render);
+    }
+
+    function drawDetections(video, canvas, ctx) {
+        if (!allDetections || allDetections.length === 0) return;
+
+        // 캔버스 크기를 비디오 표시 크기에 맞춤
+        canvas.width = video.clientWidth;
+        canvas.height = video.clientHeight;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        var currentTime = video.currentTime;
+        // 현재 시간 근처의 검출 결과 찾기 (오차범위 0.2초)
+        var currentDets = allDetections.filter(function (d) {
+            return Math.abs(d.time - currentTime) < 0.2;
+        });
+
+        if (currentDets.length === 0) return;
+
+        // 원본 비디오 해상도 대비 스케일 계산
+        // HTML5 Video의 videoWidth, videoHeight를 사용
+        var vw = video.videoWidth;
+        var vh = video.videoHeight;
+        if (!vw || !vh) return;
+
+        var scaleX = canvas.width / vw;
+        var scaleY = canvas.height / vh;
+
+        ctx.strokeStyle = '#007AFF';
+        ctx.lineWidth = 3;
+        ctx.font = 'bold 14px Arial';
+        ctx.fillStyle = '#007AFF';
+
+        currentDets.forEach(function (d) {
+            var x = d.x1 * scaleX;
+            var y = d.y1 * scaleY;
+            var w = (d.x2 - d.x1) * scaleX;
+            var h = (d.y2 - d.y1) * scaleY;
+
+            ctx.strokeRect(x, y, w, h);
+            ctx.fillText(d.class + ' ' + d.conf + '%', x, y > 20 ? y - 5 : y + 20);
+
+            // 박스 배경 살짝 채우기
+            ctx.fillStyle = 'rgba(0, 122, 255, 0.1)';
+            ctx.fillRect(x, y, w, h);
+            ctx.fillStyle = '#007AFF';
+        });
+    }
+    {% endif %}
+
+    function formatTime(sec) {
+        var m = Math.floor(sec / 60);
+        var s = Math.floor(sec % 60);
+        return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+    }
+
+    function renderHistory(data) {
+        var panel = document.getElementById('history-panel');
+        if (!panel) return;
+        if (!data || data.length === 0) {
+            var emptyHtml = '<div class="det-empty"><i class="bi bi-camera-video-off"></i> 검출된 기록이 없습니다</div>';
+            {% if is_admin %}
+            emptyHtml += '<div style="text-align:center; padding-bottom:15px;">';
+            emptyHtml += '<button onclick="reAnalyzeAI()" style="background:none; border:none; color:var(--point-orange); font-size:0.8rem; text-decoration:underline; cursor:pointer;">';
+            emptyHtml += 'AI 재분석 실행 (데이터 생성)</button></div>';
+            {% endif %}
+            panel.innerHTML = emptyHtml;
+            return;
+        }
+        var html = '';
+        for (var i = 0; i < data.length; i++) {
+            var d = data[i];
+            html += '<div class="det-item" onclick="seekToTime(' + d.time + ')">';
+            html += '<span class="det-time">' + formatTime(d.time) + '</span>';
+            html += '<span class="det-class">' + d.class + '</span>';
+            html += '<span class="det-conf">' + d.conf + '%</span>';
+            html += '</div>';
+        }
+        panel.innerHTML = html;
+    }
+
+    function toggleHistory() {
+        var panel = document.getElementById('history-panel');
+        if (panel) panel.classList.toggle('active');
+    }
+
+    function seekToTime(sec) {
+        var video = document.getElementById('cv-video');
+        if (video) {
+            video.currentTime = sec;
+            video.play();
+            var container = document.getElementById('video-cv-container');
+            if (container) container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+
+    {% if is_admin %}
+    window.toggleDetailStatusDropdown = function (e) {
+        e.stopPropagation();
+        var menu = document.getElementById('detailStatusDropdown');
+        if (menu) menu.classList.toggle('show');
+    };
+
+
+    document.addEventListener('click', function (e) {
+        var statusMenu = document.getElementById('detailStatusDropdown');
+        if (statusMenu && !e.target.closest('.status-dropdown-wrap')) {
+            statusMenu.classList.remove('show');
+        }
+    });
+
+    window.reAnalyzeAI = async function () {
+        if (!confirm('AI 분석을 다시 실행하시겠습니까? 기존 분석 데이터는 삭제됩니다.')) return;
+        if (!REPORT_ID) return;
+
+        if (typeof showPremiumLoader === 'function') showPremiumLoader();
+
+        try {
+            var resp = await fetch('/api/admin/reanalyze/' + REPORT_ID, { method: 'POST' });
+            var data = await resp.json();
+            if (data.success) {
+                if (typeof showToast === 'function') showToast(data.message);
+                setTimeout(function () { window.location.reload(); }, 1500);
+            } else {
+                if (typeof showToast === 'function') showToast('실패: ' + data.message);
+            }
+        } catch (err) {
+            if (typeof showToast === 'function') showToast('오류가 발생했습니다.');
+        }
+    };
+
+    window.updateStatusFromDetail = async function (newStatus) {
+        if (!REPORT_ID) return;
+        var payload = { status: newStatus };
+        if (newStatus === '반려' || newStatus === '삭제') {
+            var reason = prompt(newStatus + ' 사유를 입력해주세요:');
+            if (reason === null) return;
+            payload.reject_reason = reason;
+        }
+
+        if (typeof showPremiumLoader === 'function') showPremiumLoader();
+
+        try {
+            var resp = await fetch('/api/admin/report/' + REPORT_ID + '/status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            var data = await resp.json();
+            if (data.success) {
+                if (typeof showToast === 'function') showToast('상태가 변경되었습니다.');
+                setTimeout(function () { window.location.reload(); }, 800);
+            } else {
+                if (typeof showToast === 'function') showToast('실패: ' + data.message);
+            }
+        } catch (err) {
+            if (typeof showToast === 'function') showToast('오류가 발생했습니다.');
+        }
+    };
+    {% endif %}
+</script>
+
+{% endblock %}

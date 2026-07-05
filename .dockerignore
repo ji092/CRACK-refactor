@@ -1,0 +1,13 @@
+.git
+__pycache__/
+*.pyc
+.venv/
+venv/
+secrets/
+uploads/
+*.zip
+*.7z
+*.rar
+*.log
+.idea/
+.vscode/

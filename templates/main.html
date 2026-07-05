@@ -1,0 +1,178 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+    <div class="container mt-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>🚀 ITS-Guard: 도로 결함 실시간 탐지</h1>
+            <small class="text-muted">
+                <i class="fas fa-microchip"></i> <strong>활성 모델:</strong> ITS-Guard v2.0 (High-Res Refined)
+            </small>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="card p-4 shadow-sm h-100">
+                    <h5 class="card-title"><i class="fas fa-file-upload"></i> 로컬 파일 분석</h5>
+                    <p class="text-muted small">이미지 또는 블랙박스 영상을 업로드하세요.</p>
+                    <form id="analysisForm" action="/predict" method="post" enctype="multipart/form-data" onsubmit="return startAnalysis()">
+                        <div class="mb-3">
+                            <input type="file" name="video" id="videoFile" class="form-control" accept="video/*, image/*" required>
+                        </div>
+                        <button type="submit" id="submitBtn" class="btn btn-primary w-100">파일 분석 시작</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="col-md-6 mb-4">
+                <div class="card p-4 shadow-sm h-100">
+                    <h5 class="card-title text-danger"><i class="fab fa-youtube"></i> 유튜브 실시간 관제</h5>
+                    <p class="text-muted small">유튜브 주소를 입력하여 도로 상황을 원격 분석합니다.</p>
+                    <div class="mb-3">
+                        <input type="text" id="ytUrl" class="form-control" placeholder="https://www.youtube.com/watch?v=...">
+                    </div>
+                    <button type="button" id="ytBtn" onclick="startYoutubeAnalysis()" class="btn btn-outline-danger w-100">유튜브 분석 시작</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="progress-container" class="mt-2 mb-5" style="display: {% if status == 'processing' %}block{% else %}none{% endif %};">
+            <div class="progress" style="height: 25px;">
+                <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                     role="progressbar" style="width: 0%;">0%</div>
+            </div>
+            <p id="progress-message" class="text-center mt-2 text-muted small fw-bold">AI가 데이터를 분석할 준비를 하고 있습니다...</p>
+        </div>
+
+        <hr class="my-5">
+
+        {% if result_video %}
+        <div id="results-area" class="results-section mt-4 text-center animate__animated animate__fadeIn">
+            <div class="alert {% if count > 0 %}alert-danger{% else %}alert-success{% endif %} shadow-sm" role="alert">
+                <h4 class="alert-heading mb-0">
+                    {% if count > 0 %}
+                        ⚠️ <strong>위험:</strong> 총 <strong>{{ count }}</strong>개의 도로 결함이 탐지되었습니다!
+                    {% else %}
+                        ✅ <strong>안전:</strong> 탐지된 결함이 없습니다. 도로 상태가 양호합니다.
+                    {% endif %}
+                </h4>
+            </div>
+
+            {% if detections %}
+            <div class="card mt-4 mb-4 shadow-sm text-start">
+                <div class="card-header bg-dark text-white d-flex justify-content-between">
+                    <span>상세 탐지 리스트</span>
+                    <span class="badge bg-secondary">Confidence Threshold: 0.5</span>
+                </div>
+                <div class="card-body">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>유형</th>
+                                <th>신뢰도(Probability)</th>
+                                <th>상태</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for d in detections %}
+                            <tr>
+                                <td>
+                                    {% if d.label == 'Sinkhole' %}
+                                        <span class="badge bg-danger p-2 border border-light shadow-sm alert-flash">
+                                            🚨 {{ d.label }} (긴급)
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark p-2">{{ d.label }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="fw-bold">{{ (d.confidence * 100) | round(1) }}%</td>
+                                <td><span class="text-danger"><i class="fas fa-tools"></i> 조치 필요</span></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="media-container mt-3">
+                {% if result_video.lower().endswith(('.jpg', '.jpeg', '.png', '.gif')) %}
+                    <img src="{{ url_for('static', filename=result_video) }}"
+                         alt="분석 결과 이미지"
+                         style="width: 90%; border: 5px solid #343a40; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+                {% else %}
+                    <video width="90%" controls autoplay muted style="border: 5px solid #343a40; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+                        <source src="{{ url_for('static', filename=result_video) }}" type="video/mp4">
+                        브라우저가 비디오를 지원하지 않습니다.
+                    </video>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <style>
+        @keyframes flash-red {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.05); }
+        }
+        .alert-flash {
+            animation: flash-red 0.8s infinite;
+        }
+    </style>
+
+    <script>
+    let statusInterval;
+
+    // 실시간 상태 업데이트 함수
+    function monitorStatus() {
+        if (statusInterval) clearInterval(statusInterval);
+
+        statusInterval = setInterval(() => {
+            fetch('/analysis_status_api')
+                .then(response => response.json())
+                .then(data => {
+                    const percent = data.percent;
+                    const message = data.message;
+
+                    const bar = document.getElementById('progress-bar');
+                    if(bar) {
+                        bar.style.width = percent + '%';
+                        bar.innerText = percent + '%';
+                    }
+                    const msgTag = document.getElementById('progress-message');
+                    if(msgTag) {
+                        msgTag.innerText = message;
+                    }
+
+                    // 분석 완료 시 페이지 새로고침하여 결과 출력
+                    if (percent >= 100) {
+                        clearInterval(statusInterval);
+                        setTimeout(() => { location.reload(); }, 1500);
+                    }
+                })
+                .catch(err => console.error("API Error:", err));
+        }, 1000); // 1초마다 체크
+    }
+
+    // 파일 분석 시작 시 실행
+    function startAnalysis() {
+        document.getElementById('progress-container').style.display = 'block';
+        document.getElementById('submitBtn').disabled = true;
+        monitorStatus();
+        return true;
+    }
+
+    // 유튜브 분석 시작 시 실행
+    function startYoutubeAnalysis() {
+        alert("유튜브 분석 기능을 준비 중입니다.");
+    }
+
+    // 영상 처리 중일 때(리다이렉트 시) 자동으로 모니터링 시작
+    window.onload = function() {
+        if ("{{ status }}" === "processing") {
+            monitorStatus();
+        }
+    };
+    </script>
+
+{% endblock %}

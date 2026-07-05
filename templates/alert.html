@@ -1,0 +1,752 @@
+﻿{% extends "layout.html" %}
+
+{% block title %}관리자 알림 - CRACK{% endblock %}
+
+{% block extra_style %}
+<!-- extra_style 블록은 비워두고 content 내부 style 태그를 사용합니다 (FOUC 방지) -->
+{% endblock %}
+
+{% block content %}
+<style>
+  /* FOUC 방지를 위해 스타일을 content 블록 최상단으로 이동 */
+  main {
+    overflow: hidden !important;
+  }
+
+  .alert-page {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-main);
+    position: relative;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 80px;
+  }
+
+  .alert-head {
+    padding: 24px 20px 18px;
+    background: #fff;
+    border-bottom: 1px solid #eef2f7;
+    flex-shrink: 0;
+  }
+
+  .alert-head-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+
+  .alert-head h2 {
+    font-size: 22px;
+    font-weight: 900;
+    color: #0f172a;
+    margin: 0;
+    letter-spacing: -0.5px;
+  }
+
+  .alert-head-side {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .alert-head-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .alert-head-icon-btn {
+    width: 42px;
+    height: 42px;
+    border: none;
+    border-radius: 50%;
+    background: var(--point-orange);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .alert-head-icon-btn:active {
+    background: #ea580c;
+    transform: scale(0.92);
+  }
+
+  .alert-head-icon-btn svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+  }
+
+  .alert-head p {
+    font-size: 14px;
+    color: #64748b;
+    margin: 0 0 16px;
+    line-height: 1.5;
+  }
+
+  .alert-filter-row {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 2px 0 12px;
+    scrollbar-width: none;
+  }
+
+  .alert-filter-row::-webkit-scrollbar {
+    display: none;
+  }
+
+  .alert-filter-chip {
+    flex-shrink: 0;
+    padding: 8px 16px;
+    border-radius: 100px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .alert-filter-chip.active {
+    background: var(--point-orange);
+    color: #fff;
+    border-color: var(--point-orange);
+    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
+  }
+
+  .alert-list {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    opacity: 1;
+    transition: opacity 0.18s ease-in-out;
+  }
+
+  .alert-list.fade-out {
+    opacity: 0;
+  }
+
+  .alert-list.fade-in {
+    opacity: 1;
+  }
+
+  /* [NEW] 통합 필터 모달 스타일 */
+  .filter-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1002;
+    padding: 20px;
+    opacity: 0;
+    transition: opacity 0.25s ease-out;
+  }
+
+  .filter-modal-backdrop.show {
+    display: flex;
+    opacity: 1;
+  }
+
+  .filter-modal-card {
+    width: min(92vw, 420px);
+    background: #fff;
+    border-radius: 28px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 30px 70px rgba(0, 0, 0, 0.25);
+    transform: translateY(20px);
+    transition: transform 0.3s cubic-bezier(0.17, 0.67, 0.43, 1.15);
+  }
+
+  .filter-modal-backdrop.show .filter-modal-card {
+    transform: translateY(0);
+  }
+
+  .filter-modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .filter-modal-title {
+    font-size: 18px;
+    font-weight: 900;
+    color: #0f172a;
+  }
+
+  .filter-modal-close {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 50%;
+    background: #f1f5f9;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 20px;
+  }
+
+  .filter-modal-body {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .filter-section-label {
+    font-size: 13px;
+    font-weight: 800;
+    color: #64748b;
+    margin-bottom: 10px;
+    display: block;
+  }
+
+  .filter-search-box {
+    position: relative;
+  }
+
+  .filter-search-input {
+    width: 100%;
+    height: 48px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 0 16px 0 42px;
+    font-size: 14px;
+    outline: none;
+    transition: all 0.2s;
+  }
+
+  .filter-search-input:focus {
+    background: #fff;
+    border-color: var(--point-orange);
+    box-shadow: 0 0 0 4px rgba(255, 140, 0, 0.1);
+  }
+
+  .filter-search-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+  }
+
+  .filter-chip-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .filter-chip {
+    padding: 10px 18px;
+    border-radius: 12px;
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 13.5px;
+    font-weight: 700;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .filter-chip:hover {
+    background: #e2e8f0;
+  }
+
+  .filter-chip.active {
+    background: var(--point-orange);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(255, 140, 0, 0.2);
+  }
+
+  .filter-apply-btn {
+    width: 100%;
+    height: 52px;
+    background: var(--point-orange);
+    color: #fff;
+    border: none;
+    border-radius: 16px;
+    font-size: 15px;
+    font-weight: 800;
+    cursor: pointer;
+    margin-top: 10px;
+    transition: all 0.2s;
+  }
+
+  .filter-apply-btn:active {
+    transform: scale(0.97);
+  }
+
+  .alert-card {
+    background: #fff !important;
+    border-radius: 24px;
+    padding: 16px;
+    border: 1px solid #edf2f7;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .alert-card:active {
+    transform: scale(0.975);
+    background: #fafafa !important;
+  }
+
+  .alert-card:hover {
+    box-shadow: 0 6px 18px rgba(249, 115, 22, 0.08);
+    border-color: rgba(249, 115, 22, 0.15);
+  }
+
+  .alert-card::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    left: 0;
+    width: 6.5px;
+    height: 70%;
+    border-radius: 0 100px 100px 0;
+    background: transparent;
+    z-index: 10;
+  }
+
+  .alert-card.status-received::before {
+    background: #f97316;
+  }
+
+  .alert-card.status-processing::before {
+    background: #d97706;
+  }
+
+  .alert-card.status-done::before {
+    background: #16a34a;
+  }
+
+  .alert-card.status-rejected::before {
+    background: #64748b;
+  }
+
+  .alert-card.status-default::before {
+    background: #e2e8f0;
+  }
+
+  .alert-card-inner {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+
+  .alert-thumbnail-wrap {
+    width: 84px;
+    height: 84px;
+    border-radius: 18px;
+    overflow: hidden;
+    background: #f1f5f9;
+    flex-shrink: 0;
+    position: relative;
+    border: 1px solid #e2e8f0;
+  }
+
+  .alert-thumbnail {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .alert-thumbnail-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: #94a3b8;
+    text-align: center;
+    padding: 8px;
+    background: #f8fafc;
+  }
+
+  .alert-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2px;
+  }
+
+  .alert-status {
+    font-size: 13px;
+    font-weight: 800;
+    padding: 0;
+    background: transparent !important;
+    margin-bottom: 2px;
+  }
+
+  .alert-status.status-received {
+    color: #f97316 !important;
+  }
+
+  .alert-status.status-processing {
+    color: #d97706 !important;
+  }
+
+  .alert-status.status-done {
+    color: #16a34a !important;
+  }
+
+  .alert-status.status-rejected {
+    color: #64748b !important;
+  }
+
+  .alert-risk {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 900;
+  }
+
+  .risk-label {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 10px;
+    color: #64748b;
+  }
+
+  .risk-value {
+    color: #ef4444;
+  }
+
+  .risk-medium .risk-value {
+    color: #f59e0b;
+  }
+
+  .risk-low .risk-value {
+    color: #10b981;
+  }
+
+  .alert-title {
+    font-size: 15px;
+    font-weight: 800;
+    color: #1e293b;
+    margin-bottom: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .alert-location {
+    font-size: 12.5px;
+    color: #64748b;
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .alert-meta {
+    font-size: 11.5px;
+    color: #94a3b8;
+    font-weight: 500;
+  }
+
+  .alert-empty {
+    padding: 80px 20px;
+    text-align: center;
+    color: #94a3b8;
+    font-size: 14px;
+  }
+
+  .alert-load-more {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    gap: 10px;
+    color: #64748b;
+    font-size: 13.5px;
+    font-weight: 600;
+  }
+
+  .alert-load-spinner {
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(0, 0, 0, 0.05);
+    border-top: 3px solid #ff7a1a;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    0% {
+      transform: rotate(0deg);
+    }
+
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+
+
+
+
+  /* region toggle */
+  .switch {
+    position: relative;
+    width: 42px;
+    height: 22px;
+  }
+
+  .switch input {
+    display: none;
+  }
+
+  .slider {
+    position: absolute;
+    inset: 0;
+    background: #d1d5db;
+    border-radius: 999px;
+    transition: 0.2s;
+  }
+
+  .slider:before {
+    content: "";
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    left: 2px;
+    top: 2px;
+    background: white;
+    border-radius: 50%;
+    transition: 0.2s;
+  }
+
+  input:checked+.slider {
+    background: #ff7a1a;
+  }
+
+  input:checked+.slider:before {
+    transform: translateX(20px);
+  }
+</style>
+
+
+<div class="alert-page">
+  <!-- 불필요한 관리자 알림 텍스트 헤더 완전 삭제 -->
+  <div class="alert-list" id="alertList" style="padding-top: 0; margin-top: -4px;">
+    {% for item in alerts %}
+    <div class="alert-card 
+      {% if item.status == '접수완료' %}status-received
+      {% elif item.status == '신고 처리중' or item.status == '처리중' %}status-processing
+      {% elif item.status == '처리 완료' or item.status == '처리완료' %}status-done
+      {% elif item.status == '반려' %}status-rejected
+      {% else %}status-default{% endif %}" data-search-title="{{ item.title|default('', true)|e }}"
+      data-search-location="{{ item.location|default('', true)|e }}"
+      data-search-content="{{ item.content|default('', true)|e }}" data-status="{{ item.status|default('', true)|e }}"
+      onclick="window.location.href='/alert/view/{{ item.id }}'">
+      <div class="alert-card-inner">
+        <div class="alert-thumbnail-wrap" style="position: relative;">
+          {% if item.file_type == 'video' %}
+          <div
+            style="position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,0.6); color: white; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 10;">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="white">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </div>
+          {% endif %}
+          {% if item.image_path %}
+          <img src="{{ '/uploads/' + item.image_path if not item.image_path.startswith('/') else item.image_path }}"
+            class="alert-thumbnail" alt="썸네일">
+          {% else %}
+          <div class="alert-thumbnail-placeholder">No Image</div>
+          {% endif %}
+        </div>
+        <div class="alert-main-content" style="flex: 1; min-width: 0;">
+          <div class="alert-top">
+            <div class="alert-status {{ item.status_class }}">{{ item.status }}</div>
+            <div class="alert-risk {{ item.risk_class }}">
+              <span class="risk-label">AI</span>
+              <span class="risk-value">{{ item.risk_score }}%</span>
+            </div>
+          </div>
+          <div class="alert-main" style="margin-top: 6px;">
+            <div class="alert-title">{{ item.title }}</div>
+            <div class="alert-location">{{ item.location }}</div>
+            <div class="alert-meta">
+              {{ item.created_at }} · 반복 {{ item.group_reporter_count }}건
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+    <div id="alertLoadMore" class="alert-load-more" style="display:none;">
+      <div class="alert-load-spinner"></div>
+      <span>불러오는 중...</span>
+    </div>
+    {% if alerts|length == 0 %}
+    <div class="alert-empty">표시할 신고가 없습니다.</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- [NEW] 통합 필터 모달 -->
+<div id="filterModal" class="filter-modal-backdrop" onclick="if(event.target==this) closeFilterModal()">
+  <div class="filter-modal-card">
+    <div class="filter-modal-head">
+      <div class="filter-modal-title">필터 및 검색</div>
+      <button class="filter-modal-close" type="button" onclick="closeFilterModal()">×</button>
+    </div>
+    <div class="filter-modal-body">
+      <div class="filter-section">
+        <label class="filter-section-label">사건 검색</label>
+        <div class="filter-search-box">
+          <i class="bi bi-search filter-search-icon"></i>
+          <input id="modalSearchInput" class="filter-search-input" type="text" placeholder="제목, 위치, 설명 검색..."
+            oninput="filterAlertCards()">
+        </div>
+      </div>
+      <div class="filter-section">
+        <label class="filter-section-label">진행 상태</label>
+        <div class="filter-chip-group" id="modalFilterRow">
+          <button type="button" class="filter-chip active" data-status="all"
+            onclick="filterByStatus('all', this)">전체</button>
+          <button type="button" class="filter-chip" data-status="접수완료"
+            onclick="filterByStatus('접수완료', this)">접수완료</button>
+          <button type="button" class="filter-chip" data-status="처리중" onclick="filterByStatus('처리중', this)">처리중</button>
+          <button type="button" class="filter-chip" data-status="처리완료"
+            onclick="filterByStatus('처리완료', this)">처리완료</button>
+          <button type="button" class="filter-chip" data-status="반려" onclick="filterByStatus('반려', this)">반려</button>
+        </div>
+      </div>
+      <button type="button" class="filter-apply-btn" onclick="closeFilterModal()">적용하기</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+  let currentFilterStatus = 'all';
+  let alertVisibleCount = 8;
+  const alertLoadStep = 6;
+  let alertIsLoading = false;
+  let alertAllCards = [];
+
+
+  window.openFilterModal = function () {
+    const modal = document.getElementById('filterModal');
+    modal.style.display = 'flex';
+    setTimeout(() => modal.classList.add('show'), 10);
+    document.body.style.overflow = 'hidden';
+  };
+
+  window.closeFilterModal = function () {
+    const modal = document.getElementById('filterModal');
+    modal.classList.remove('show');
+    setTimeout(() => {
+      modal.style.display = 'none';
+      document.body.style.overflow = '';
+    }, 250);
+  };
+
+  // 기존 검색 모달 함수 호환성 위해 유지
+  window.openSearchModal = window.openFilterModal;
+  window.closeSearchModal = window.closeFilterModal;
+
+  window.filterByStatus = function (status, btn) {
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    currentFilterStatus = status;
+    filterAlertCards();
+  };
+
+  window.filterAlertCards = function () {
+    const query = (document.getElementById('modalSearchInput')?.value || '').toLowerCase();
+    const allCards = Array.from(document.querySelectorAll('.alert-card'));
+
+    alertAllCards = allCards.filter(card => {
+      const matchStatus = (currentFilterStatus === 'all' || card.dataset.status === currentFilterStatus);
+      const title = (card.dataset.searchTitle || '').toLowerCase();
+      const location = (card.dataset.searchLocation || '').toLowerCase();
+      const content = (card.dataset.searchContent || '').toLowerCase();
+      const matchQuery = !query || title.includes(query) || location.includes(query) || content.includes(query);
+      return matchStatus && matchQuery;
+    });
+
+    alertVisibleCount = 8;
+    updateVisibleAlertCards();
+  };
+
+  function updateVisibleAlertCards() {
+    const allCards = document.querySelectorAll('.alert-card');
+    allCards.forEach(card => card.style.display = 'none');
+    alertAllCards.slice(0, alertVisibleCount).forEach(card => card.style.display = '');
+
+    const loadMoreBtn = document.getElementById('alertLoadMore');
+    if (loadMoreBtn) {
+      loadMoreBtn.style.display = alertVisibleCount < alertAllCards.length ? 'flex' : 'none';
+    }
+
+    const emptyMsg = document.querySelector('.alert-empty');
+    if (emptyMsg) {
+      emptyMsg.style.display = alertAllCards.length === 0 ? 'block' : 'none';
+    }
+  }
+
+  function openAlertDetail(id) {
+    // 하위 호환성을 위해 유지하거나, 필요 시 모달 호출로 리다이렉트
+    // 현재는 각 카드의 onclick에서 직접 openAlertDetailModal을 호출하도록 변경함
+    window.location.href = '/alert/view/' + id;
+  }
+
+  function scrollAlertsToTop() {
+    document.querySelector('.alert-page').scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+
+  document.addEventListener('DOMContentLoaded', () => {
+    filterAlertCards();
+  });
+
+  // 무한 스크롤 이벤트 추가
+  const alertPage = document.querySelector('.alert-page');
+  if (alertPage) {
+    alertPage.onscroll = function (e) {
+      if (alertIsLoading) return;
+      const { scrollTop, scrollHeight, clientHeight } = e.target;
+      if (scrollTop + clientHeight >= scrollHeight - 30) {
+        if (alertVisibleCount < alertAllCards.length) {
+          alertIsLoading = true;
+          document.getElementById('alertLoadMore').style.display = 'flex';
+          setTimeout(() => {
+            alertVisibleCount += alertLoadStep;
+            updateVisibleAlertCards();
+            alertIsLoading = false;
+          }, 400);
+        }
+      }
+    };
+  }
+</script>
+{% endblock %}

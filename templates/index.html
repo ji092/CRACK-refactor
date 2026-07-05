@@ -1,0 +1,157 @@
+{% extends 'layout.html' %}
+
+{% block title %}Home - Crack{% endblock %}
+
+{% block content %}
+<style>
+    .service-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        padding-top: 10px;
+    }
+
+    .service-card {
+        background: white;
+        border-radius: 28px;
+        padding: 24px 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.04);
+        border: 1px solid rgba(0, 0, 0, 0.02);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        text-decoration: none;
+        color: inherit;
+        position: relative;
+        overflow: hidden;
+        aspect-ratio: 1 / 1.1;
+    }
+
+    .service-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 35px rgba(249, 115, 22, 0.2);
+        border-color: rgba(249, 115, 22, 0.3);
+    }
+
+    .service-card i {
+        font-size: 3rem;
+        margin-bottom: 14px;
+        color: var(--point-orange);
+        transition: transform 0.3s ease;
+    }
+
+    .service-card:hover i {
+        transform: scale(1.1) rotate(5deg);
+    }
+
+    .service-title {
+        font-size: 1.3rem;
+        font-weight: 800;
+        margin-bottom: 6px;
+        font-family: 'Outfit', sans-serif;
+    }
+
+    .service-desc {
+        font-size: 0.85rem;
+        opacity: 0.5;
+        line-height: 1.4;
+        font-weight: 500;
+    }
+
+    .welcome-section {
+        margin-bottom: 24px;
+        padding: 30px 4px 10px 4px;
+        /* 상단 패딩을 10px에서 30px로 증량 */
+    }
+
+    .welcome-text {
+        font-size: 1.4rem;
+        font-weight: 900;
+        font-family: 'Outfit', sans-serif;
+        line-height: 1.2;
+    }
+
+    .welcome-text span {
+        color: var(--point-orange);
+    }
+
+    /* 애니메이션 효과 */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .service-card {
+        animation: fadeInUp 0.5s ease backwards;
+    }
+
+    .service-card:nth-child(1) {
+        animation-delay: 0.1s;
+    }
+
+    .service-card:nth-child(2) {
+        animation-delay: 0.2s;
+    }
+
+    .service-card:nth-child(3) {
+        animation-delay: 0.3s;
+    }
+
+    .service-card:nth-child(4) {
+        animation-delay: 0.4s;
+    }
+
+    .service-card:nth-child(5) {
+        animation-delay: 0.5s;
+    }
+
+    /* 관리자 카드 특별 스타일 */
+    .admin-dashboard-card:hover {
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2) !important;
+        transform: translateY(-5px);
+    }
+</style>
+<div class="welcome-section">
+    <h1 class="welcome-text">
+        안녕하세요, <span>{{ session.get('user_name', '탐험가') }}</span>님!<br>
+        무엇을 도와드릴까요?
+    </h1>
+</div>
+
+<div class="service-container">
+    <a href="/alert" class="service-card">
+        <i class="bi bi-bell-fill"></i>
+        <div class="service-title">Alert</div>
+        <div class="service-desc">실시간 도로 파손<br>위험 지역 알림</div>
+    </a>
+
+    <a href="/report" class="service-card" onclick="return checkMyPage(event)">
+        <i class="bi bi-plus-circle-fill"></i>
+        <div class="service-title">Report</div>
+        <div class="service-desc">직접 파손 제보<br>AI 분석 및 등록</div>
+    </a>
+
+    <a href="/status" class="service-card" onclick="return checkMyPage(event)">
+        <i class="bi bi-file-text-fill"></i>
+        <div class="service-title">Status</div>
+        <div class="service-desc">나의 제보 현황<br>및 처리 결과 확인</div>
+    </a>
+
+    <a href="/mypage" class="service-card" onclick="return checkMyPage(event)">
+        <i class="bi bi-person-fill"></i>
+        <div class="service-title">My</div>
+        <div class="service-desc">포인트 확인 및<br>프로필 관리</div>
+    </a>
+
+</div>
+{% endblock %}

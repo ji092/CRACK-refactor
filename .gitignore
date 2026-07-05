@@ -1,0 +1,27 @@
+secrets/
+.env
+__pycache__/
+*.pyc
+
+# [추가] 대용량 및 불필요 파일 제외
+*.zip
+*.7z
+*.rar
+.venv/
+venv/
+node_modules/
+uploads/images/
+uploads/videos/
+tmp/
+.idea/
+.vscode/
+*.log
+skill.txt
+*.pt
+.pytest_cache/
+
+# 내부 문서/테스트 (푸시 제외)
+PROJECT_STRUCTURE.md
+README_DEPLOY.md
+tests/
+pytest.ini

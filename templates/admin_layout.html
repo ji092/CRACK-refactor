@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}CRACK 관리자{% endblock %}</title>
+
+  <style>
+    :root {
+      --bg: #f2f0eb;
+      --surface: rgba(255, 255, 255, 0.78);
+      --surface-soft: #f8fafc;
+      --border: #dbe3ec;
+      --border-strong: #d8dde6;
+      --text: #0f172a;
+      --text-sub: #64748b;
+      --accent: #ff7a1a;
+      --accent-dark: #ea6500;
+      --shadow-lg:
+        0 18px 40px rgba(15, 23, 42, 0.08),
+        0 4px 12px rgba(15, 23, 42, 0.04);
+      --shadow-md: 0 10px 30px rgba(15, 23, 42, 0.06);
+      --shadow-sm: 0 4px 14px rgba(15, 23, 42, 0.04);
+      --radius-xl: 30px;
+      --radius-lg: 20px;
+      --radius-md: 14px;
+      --radius-sm: 10px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: "Pretendard", "Noto Sans KR", Arial, sans-serif;
+    }
+
+    html,
+    body {
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .layout {
+      height: 100dvh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      background-color: var(--bg);
+      overflow: hidden;
+    }
+
+    .page-transition-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(244, 246, 248, 0.18);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.16s ease;
+      z-index: 3000;
+    }
+
+    .page-transition-overlay.show {
+      opacity: 1;
+    }
+
+    .dashboard-shell.page-leaving {
+      opacity: 0.92;
+      transition: opacity 0.12s ease;
+    }
+
+    body.admin-enter {
+      overflow: hidden;
+    }
+
+    body.admin-enter .layout {
+      opacity: 0;
+      transform: scale(0.992);
+    }
+
+    body.admin-enter .dashboard-shell {
+      opacity: 0;
+      transform: translateY(10px) scaleY(0.985);
+      transform-origin: center top;
+      filter: blur(4px);
+      box-shadow:
+        0 10px 24px rgba(15, 23, 42, 0.05),
+        0 2px 8px rgba(15, 23, 42, 0.03);
+    }
+
+    body.admin-enter .dashboard-shell > * {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+
+    body.admin-enter-active .layout {
+      opacity: 1;
+      transform: scale(1);
+      transition: opacity 0.22s ease, transform 0.38s ease;
+    }
+
+    body.admin-enter-active .dashboard-shell {
+      opacity: 1;
+      transform: translateY(0) scaleY(1);
+      filter: blur(0);
+      box-shadow:
+        0 18px 40px rgba(15, 23, 42, 0.08),
+        0 4px 12px rgba(15, 23, 42, 0.04);
+      transition:
+        opacity 0.24s ease 0.04s,
+        transform 0.46s cubic-bezier(0.22, 1, 0.36, 1) 0.04s,
+        filter 0.28s ease 0.04s,
+        box-shadow 0.28s ease 0.04s;
+    }
+
+    body.admin-enter-active .dashboard-shell > * {
+      opacity: 1;
+      transform: translateY(0);
+      transition:
+        opacity 0.28s ease 0.18s,
+        transform 0.46s cubic-bezier(0.22, 1, 0.36, 1) 0.18s;
+    }
+
+    .main {
+      width: 100%;
+      max-width: 1500px;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+
+    .dashboard-shell {
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 18px 22px 18px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: var(--shadow-lg);
+      backdrop-filter: blur(6px);
+      overflow: hidden;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      height: 60px;
+      margin-bottom: 8px;
+    }
+
+    .topbar-left {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .header-brand {
+      flex-shrink: 0;
+      text-decoration: none;
+      color: inherit;
+      display: block;
+    }
+
+    .header-brand-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 2px;
+    }
+
+    .logo-icon {
+      font-size: 24px;
+      display: flex;
+      align-items: center;
+      line-height: 1;
+    }
+
+    .header-brand-main {
+      font-size: 22px;
+      font-weight: 900;
+      color: var(--accent);
+      letter-spacing: -0.8px;
+      line-height: 1;
+      margin-bottom: -2px;
+      margin-left: -4px;
+    }
+
+    .header-brand-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 24px;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: #f1f5f9;
+      color: #0f172a;
+      font-size: 12px;
+      font-weight: 800;
+      border: 1px solid #e2e8f0;
+      line-height: 1;
+      white-space: nowrap;
+      margin-bottom: -5px;
+    }
+
+    .header-brand-sub {
+      font-size: 12px;
+      color: #8b95a1;
+      margin-top: 0;
+      margin-left: 26px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .header-quick-actions {
+      display: flex;
+      gap: 14px;
+      margin-top: 10px;
+      margin-left: 8px;
+    }
+
+    .quick-btn {
+      width: 36px;
+      height: 36px;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.92);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      color: #334155;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+      transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+    }
+
+    .quick-btn:hover {
+      transform: translateY(-1px);
+      border-color: #cbd5e1;
+      box-shadow: 0 12px 24px rgba(15, 23, 42, 0.10);
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 22px;
+      flex-shrink: 0;
+    }
+
+    .topbar-menu {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-right: 8px;
+    }
+
+    .menu-item {
+      font-size: 16px;
+      font-weight: 700;
+      color: #64748b;
+      letter-spacing: -0.2px;
+      text-decoration: none;
+      transition: color 0.15s ease;
+    }
+
+    .menu-item:hover {
+      color: #0f172a;
+    }
+
+    .menu-item.active {
+      color: #0f172a;
+      font-weight: 800;
+    }
+
+    .topbar-user {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .account-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
+      white-space: nowrap;
+
+      text-decoration: none !important;
+      color: inherit !important;
+    }
+
+    .account-chip strong {
+      font-size: 13px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+
+    .account-chip span {
+      font-size: 12px;
+      color: #64748b;
+      font-weight: 700;
+    }
+
+    .logout-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 40px;
+      padding: 0 14px;
+      border-radius: 999px;
+      border: 1px solid #e2e8f0;
+      background: #fff;
+      color: #334155;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 800;
+      transition: all 0.15s ease;
+    }
+
+    .logout-pill:hover {
+      border-color: #cbd5e1;
+      color: #0f172a;
+      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+    }
+
+    .page-body {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-right: 4px;
+    }
+
+    .page-body::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .page-body::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .page-body::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.05);
+      border-radius: 10px;
+    }
+
+    .page-body::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 0, 0, 0.1);
+    }
+
+    @media (max-width: 1100px) {
+      .layout {
+        align-items: flex-start;
+      }
+
+      .dashboard-shell {
+        min-height: auto;
+      }
+
+      .topbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .topbar-actions {
+        flex-wrap: wrap;
+        justify-content: space-between;
+      }
+
+      .topbar-menu {
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-right: 0;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .layout {
+        padding: 12px;
+      }
+
+      .dashboard-shell {
+        padding: 16px;
+        border-radius: 22px;
+      }
+
+      .topbar-left {
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .header-quick-actions {
+        margin-top: 0;
+        margin-left: 0;
+      }
+
+      .header-brand-sub {
+        margin-left: 0;
+      }
+
+      .topbar-actions {
+        gap: 14px;
+      }
+
+      .topbar-user {
+        flex-wrap: wrap;
+      }
+    }
+  </style>
+
+  {% block extra_style %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <div class="layout">
+    <main class="main">
+      <div class="dashboard-shell">
+        <header class="topbar">
+          <div class="topbar-left">
+            <a href="/admin/dashboard" class="header-brand js-page-transition-link">
+              <div class="header-brand-row">
+                <span class="logo-icon">⚡</span>
+                <span class="header-brand-main">CRACK</span>
+                <span class="header-brand-badge">관리자용</span>
+              </div>
+              <div class="header-brand-sub">Admin Monitoring System</div>
+            </a>
+
+            {% block quick_actions %}
+            <div class="header-quick-actions"></div>
+            {% endblock %}
+          </div>
+
+          <div class="topbar-actions">
+            <nav class="topbar-menu">
+              <a href="/admin/dashboard"
+                 class="menu-item js-page-transition-link {% if request.path == '/admin/dashboard' %}active{% endif %}">
+                대시보드
+              </a>
+              <a href="/admin/incidents"
+                 class="menu-item js-page-transition-link {% if request.path.startswith('/admin/incidents') %}active{% endif %}">
+                신고관리
+              </a>
+              <a href="/admin/members"
+                  class="menu-item js-page-transition-link {% if request.path.startswith('/admin/members') %}active{% endif %}">
+                회원관리
+              </a>
+              <a href="/admin/statistics"
+                 class="menu-item js-page-transition-link {% if request.path.startswith('/admin/statistics') %}active{% endif %}">
+                통계
+              </a>
+            </nav>
+
+            <div class="topbar-user">
+              {% block account_area %}
+              <a
+                href="{{ url_for('admin.admin_member_detail', member_id=session.get('user_id')) }}"
+                class="account-chip js-page-transition-link"
+              >
+                <strong>{{ session.get('user_name', '관리자') }}</strong>
+                <span>{{ session.get('role', 'admin') }}</span>
+              </a>
+              <a href="/logout" class="logout-pill js-page-transition-link">로그아웃</a>
+              {% endblock %}
+            </div>
+          </div>
+        </header>
+
+        <section class="page-body">
+          {% block content %}{% endblock %}
+        </section>
+      </div>
+    </main>
+  </div>
+
+<div class="page-transition-overlay" id="pageTransitionOverlay" aria-hidden="true"></div>
+
+<script>
+(function () {
+  const overlay = document.getElementById('pageTransitionOverlay');
+
+  function clearTransitionState() {
+    if (overlay) {
+      overlay.classList.remove('show');
+    }
+
+    const shell = document.querySelector('.dashboard-shell');
+    if (shell) {
+      shell.classList.remove('page-leaving');
+    }
+
+    document.body.classList.remove('admin-enter');
+    document.body.classList.remove('admin-enter-active');
+  }
+
+  function runEnterAnimation() {
+    document.body.classList.add('admin-enter');
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        document.body.classList.add('admin-enter-active');
+      });
+    });
+
+    setTimeout(() => {
+      document.body.classList.remove('admin-enter');
+      document.body.classList.remove('admin-enter-active');
+    }, 900);
+  }
+
+  function isModifiedEvent(event) {
+    return event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0;
+  }
+
+  function isSamePage(link) {
+    const targetUrl = new URL(link.href, window.location.href);
+    return (
+      targetUrl.pathname === window.location.pathname &&
+      targetUrl.search === window.location.search &&
+      targetUrl.hash === window.location.hash
+    );
+  }
+
+  function runPageTransition(href) {
+    if (!href) return;
+
+    const shell = document.querySelector('.dashboard-shell');
+    if (overlay) overlay.classList.add('show');
+    if (shell) shell.classList.add('page-leaving');
+
+    setTimeout(() => {
+      window.location.href = href;
+    }, 160);
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    runEnterAnimation();
+
+    document.addEventListener('click', function (event) {
+      const link = event.target.closest('a.js-page-transition-link');
+      if (!link) return;
+
+      const href = link.getAttribute('href');
+      if (!href) return;
+      if (href.startsWith('#')) return;
+      if (link.target === '_blank') return;
+      if (link.hasAttribute('download')) return;
+      if (isModifiedEvent(event)) return;
+      if (isSamePage(link)) return;
+
+      event.preventDefault();
+      runPageTransition(link.href);
+    });
+  });
+
+  window.addEventListener('pageshow', function () {
+    clearTransitionState();
+  });
+
+  window.addEventListener('popstate', function () {
+    clearTransitionState();
+  });
+})();
+</script>
+{% block extra_script %}{% endblock %}
+</body>
+</html>

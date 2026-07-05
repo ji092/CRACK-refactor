@@ -1,0 +1,795 @@
+{% extends "admin_layout.html" %}
+
+{% block title %}CRACK 회원 관리{% endblock %}
+
+{% block quick_actions %}
+<div class="header-quick-actions">
+  <a href="/alert" class="quick-btn alert-btn js-page-transition-link" title="알림">🔔</a>
+</div>
+{% endblock %}
+
+{% block account_area %}
+<a href="{{ url_for('admin.admin_member_detail', member_id=session.get('user_id')) }}"
+  class="account-chip js-page-transition-link">
+  <strong>{{ session.get('user_name', '관리자') }}님</strong>
+  <span>{{ session.get('role', 'admin') }}</span>
+</a>
+<a href="/logout" class="logout-pill js-page-transition-link">로그아웃</a>
+{% endblock %}
+
+{% block extra_style %}
+<style>
+  .alert-btn {
+    color: #f59e0b;
+  }
+
+  .section {
+    background: rgba(248, 250, 252, 0.9);
+    border: 1px solid #e5eaf1;
+    border-radius: 20px;
+    padding: 18px 16px 18px;
+    min-height: 650px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 12px;
+    flex-wrap: nowrap;
+  }
+
+  .section-title-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .section-title {
+    font-size: 18px;
+    font-weight: 900;
+    letter-spacing: -0.4px;
+    color: #0f172a;
+    margin-left: 15px
+  }
+
+  .section-subtitle {
+    font-size: 11px;
+    color: #7b8794;
+    font-weight: 600;
+    margin-left: 15px
+  }
+
+  .member-filter-form {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    margin-left: auto;
+  }
+
+  .filter-input,
+  .filter-select {
+    height: 36px;
+    border: 1px solid #d7dde5;
+    border-radius: 10px;
+    padding: 0 10px;
+    font-size: 12px;
+    color: #334155;
+    background: #fff;
+    outline: none;
+  }
+
+  .filter-input {
+    width: 260px;
+    min-width: 260px;
+  }
+
+  .filter-input:focus,
+  .filter-select:focus {
+    border-color: #c9d3df;
+    box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.12);
+  }
+
+  .filter-btn,
+  .filter-reset-btn {
+    height: 36px;
+    padding: 0 12px;
+    border-radius: 10px;
+    border: 1px solid #d7dde5;
+    background: #fff;
+    color: #334155;
+    font-size: 12px;
+    font-weight: 800;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.18s ease;
+  }
+
+  .filter-btn:hover,
+  .filter-reset-btn:hover {
+    background: #f8fafc;
+    border-color: #c9d3df;
+    transform: translateY(-1px);
+  }
+
+  /* number input 화살표 제거 */
+  .pagination-jump-input-inline::-webkit-outer-spin-button,
+  .pagination-jump-input-inline::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .pagination-jump-input-inline {
+    -moz-appearance: textfield;
+    /* Firefox */
+  }
+
+  .table-shell {
+    border: 1px solid #edf1f5;
+    border-radius: 18px;
+    overflow: hidden;
+    background: #fff;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    table-layout: fixed;
+  }
+
+  thead th {
+    text-align: center;
+    background: #f8fafc;
+    color: #475569;
+    font-weight: 800;
+    padding: 15px 15px;
+    border-bottom: 1px solid #e9eef5;
+    white-space: nowrap;
+    font-size: 12.5px;
+    line-height: 1.15;
+  }
+
+  tbody td {
+    padding: 13px 13px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #0f172a;
+    vertical-align: middle;
+    font-size: 13px;
+    font-weight: 500;
+    text-align: center;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  tbody td:nth-child(2) {
+    font-weight: 600;
+  }
+
+  tbody tr:hover {
+    background: #fcfcfd;
+  }
+
+  tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .role-badge,
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    white-space: nowrap;
+    line-height: 1;
+    font-weight: 800;
+  }
+
+  .role-badge {
+    min-width: 66px;
+    height: 21px;
+    padding: 0 8px;
+    font-size: 10.5px;
+  }
+
+  .empty-row span {
+    display: block;
+    font-size: 11px;
+    color: #94a3b8;
+    margin-top: 6px;
+  }
+
+  .status-badge {
+    min-width: 56px;
+    height: 20px;
+    padding: 0 8px;
+    font-size: 10px;
+  }
+
+  .status-active {
+    background: #ecfdf5;
+    color: #059669;
+  }
+
+  .status-suspended {
+    background: #fef2f2;
+    color: #dc2626;
+  }
+
+  .role-admin {
+    background: #fff1f2;
+    color: #dc2626;
+  }
+
+  .role-manager {
+    background: #fff7ed;
+    color: #ea580c;
+  }
+
+  .role-user {
+    background: #f1f5f9;
+    color: #64748b;
+  }
+
+  .empty-row {
+    text-align: center;
+    color: #94a3b8;
+    padding: 28px;
+  }
+
+  .table-bottom-bar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+
+  .pagination-row {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .page-btn {
+    height: 34px;
+    padding: 0 14px;
+    border: 1px solid #d7dde5;
+    background: #fff;
+    color: #334155;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 800;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.18s ease;
+  }
+
+  .page-btn.disabled {
+    opacity: 0.35;
+    pointer-events: none;
+    cursor: default;
+    transform: none;
+  }
+
+  .page-btn:hover {
+    background: #f8fafc;
+    border-color: #c9d3df;
+    transform: translateY(-1px);
+  }
+
+  .page-btn.current {
+    cursor: default;
+    background: #f8fafc;
+  }
+
+  .pagination-jump {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 72px;
+    height: 32px;
+  }
+
+  .pagination-current-btn {
+    min-width: 72px;
+    height: 32px;
+    justify-content: center;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+
+  .pagination-jump-edit {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    height: 32px;
+    padding: 0 7px;
+    border: 1px solid #d7dde5;
+    border-radius: 12px;
+    background: #ffffff;
+  }
+
+  .pagination-jump-input-inline {
+    width: 14px;
+    border: none;
+    background: transparent;
+    color: #334155;
+    font-size: 12px;
+    font-weight: 800;
+    text-align: right;
+    outline: none;
+    padding: 0;
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
+  .pagination-jump-total {
+    font-size: 11px;
+    font-weight: 800;
+    color: #64748b;
+    white-space: nowrap;
+  }
+
+  .pagination-jump.editing .pagination-current-btn {
+    visibility: hidden;
+  }
+
+  .pagination-jump.editing .pagination-jump-edit {
+    display: inline-flex;
+  }
+
+  .pagination-jump-input-inline::-webkit-outer-spin-button,
+  .pagination-jump-input-inline::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .detail-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 68px;
+    height: 30px;
+    padding: 0 10px;
+    border-radius: 8px;
+    border: 1px solid #d7dde5;
+    background: #fff;
+    color: #334155;
+    text-decoration: none;
+    font-size: 11.5px;
+    font-weight: 800;
+    line-height: 1;
+    transition: all 0.18s ease;
+  }
+
+  .detail-btn:hover {
+    background: #f8fafc;
+    border-color: #c9d3df;
+    transform: translateY(-1px);
+  }
+
+  thead th[data-sort] {
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.16s ease;
+  }
+
+  thead th[data-sort]:hover {
+    background: #f8fafc;
+    color: #475569;
+  }
+
+  .sort-indicator {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 4px;
+    font-size: 10px;
+    font-weight: 900;
+    color: #2563eb;
+    vertical-align: middle;
+  }
+
+  .page-transition-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(244, 246, 248, 0.18);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.16s ease;
+    z-index: 3000;
+  }
+
+  .page-transition-overlay.show {
+    opacity: 1;
+  }
+
+  .dashboard-shell.page-leaving {
+    opacity: 0.92;
+    transition: opacity 0.12s ease;
+  }
+
+  @media (max-width: 1024px) {
+    .section-header {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .member-filter-form {
+      justify-content: flex-start;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .filter-input {
+      min-width: 100%;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="section">
+  <div class="section-header">
+    <div class="section-title-wrap">
+      <div class="section-title">회원 관리</div>
+      <div class="section-subtitle">전체 회원 목록과 역할 정보를 확인할 수 있습니다.</div>
+    </div>
+
+    <form method="get" action="/admin/members" class="member-filter-form">
+      <input type="hidden" name="sort" value="{{ sort or 'created_at' }}">
+      <input type="hidden" name="order" value="{{ order or 'desc' }}">
+      <input type="hidden" name="header_sorted" value="{{ '1' if request.args.get('header_sorted') == '1' else '' }}">
+
+      <input type="text" name="keyword" value="{{ keyword }}" placeholder="이름 또는 아이디 검색" class="filter-input" />
+
+      <select name="role" class="filter-select">
+        <option value="">전체 역할</option>
+        <option value="user" {% if role=='user' %}selected{% endif %}>일반회원</option>
+        <option value="manager" {% if role=='manager' %}selected{% endif %}>매니저</option>
+        <option value="admin" {% if role=='admin' %}selected{% endif %}>관리자</option>
+      </select>
+
+      <button type="submit" class="filter-btn">검색</button>
+
+      <a href="/admin/members" class="filter-reset-btn js-page-transition-link">초기화</a>
+    </form>
+  </div>
+  <div class="table-shell">
+    <div class="table-wrap">
+      <table>
+        <colgroup>
+          <col style="width: 10%;">
+          <col style="width: 14%;">
+          <col style="width: 16%;">
+          <col style="width: 14%;">
+          <col style="width: 14%;">
+          <col style="width: 16%;">
+          <col style="width: 16%;">
+        </colgroup>
+        {% set explicit_sort = request.args.get('sort') %}
+        {% set header_sorted = request.args.get('header_sorted') == '1' %}
+        <thead>
+          <tr>
+            <th data-sort="id" class="{% if header_sorted and sort == 'id' %}sort-active{% endif %}">
+              번호
+              {% if header_sorted and sort == 'id' %}
+              <span class="sort-indicator">{{ '▲' if order == 'asc' else '▼' }}</span>
+              {% endif %}
+            </th>
+
+            <th data-sort="name" class="{% if header_sorted and sort == 'name' %}sort-active{% endif %}">
+              이름
+              {% if header_sorted and sort == 'name' %}
+              <span class="sort-indicator">{{ '▲' if order == 'asc' else '▼' }}</span>
+              {% endif %}
+            </th>
+
+            <th data-sort="uid" class="{% if header_sorted and sort == 'uid' %}sort-active{% endif %}">
+              아이디
+              {% if header_sorted and sort == 'uid' %}
+              <span class="sort-indicator">{{ '▲' if order == 'asc' else '▼' }}</span>
+              {% endif %}
+            </th>
+
+            <th data-sort="role" class="{% if header_sorted and sort == 'role' %}sort-active{% endif %}">
+              역할
+              {% if header_sorted and sort == 'role' %}
+              <span class="sort-indicator">{{ '▲' if order == 'asc' else '▼' }}</span>
+              {% endif %}
+            </th>
+
+            <th data-sort="active" class="{% if header_sorted and sort == 'active' %}sort-active{% endif %}">
+              상태
+              {% if header_sorted and sort == 'active' %}
+              <span class="sort-indicator">{{ '▲' if order == 'asc' else '▼' }}</span>
+              {% endif %}
+            </th>
+
+            <th data-sort="created_at" class="{% if header_sorted and sort == 'created_at' %}sort-active{% endif %}">
+              가입일
+              {% if header_sorted and sort == 'created_at' %}
+              <span class="sort-indicator">{{ '▲' if order == 'asc' else '▼' }}</span>
+              {% endif %}
+            </th>
+
+            <th>상세</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for member in members %}
+          <tr>
+            <td>{{ member.id }}</td>
+            <td>{{ member.name }}</td>
+            <td>{{ member.uid }}</td>
+            <td>
+              {% if member.role == 'admin' %}
+              <span class="role-badge role-admin">관리자</span>
+              {% elif member.role == 'manager' %}
+              <span class="role-badge role-manager">매니저</span>
+              {% else %}
+              <span class="role-badge role-user">일반회원</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if member.active %}
+              <span class="status-badge status-active">활성</span>
+              {% else %}
+              <span class="status-badge status-suspended">정지</span>
+              {% endif %}
+            </td>
+            <td>{{ member.created_at.strftime('%Y-%m-%d') if member.created_at else '-' }}</td>
+            <td>
+              <a href="/admin/members/{{ member.id }}?page={{ page }}&keyword={{ keyword }}&role={{ role }}&sort={{ sort }}&order={{ order }}"
+                class="detail-btn js-page-transition-link">
+                상세보기
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+
+          {% if members|length == 0 %}
+          <tr>
+            <td colspan="7" class="empty-row">
+              👤 표시할 회원이 없습니다<br>
+              <span>필터를 변경하거나 회원을 추가해보세요</span>
+            </td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if total_pages > 1 %}
+  <div class="table-bottom-bar">
+    <div class="pagination-row">
+      <a href="{{ '/admin/members?page=' ~ (page - 1) ~ '&keyword=' ~ keyword ~ '&role=' ~ role ~ '&sort=' ~ sort ~ '&order=' ~ order ~ '&header_sorted=' ~ ('1' if request.args.get('header_sorted') == '1' else '') if page > 1 else '#' }}"
+        class="page-btn js-page-transition-link {% if page == 1 %}disabled{% endif %}">
+        이전
+      </a>
+
+      <div class="pagination-jump" id="paginationJumpBox">
+        <button type="button" class="page-btn current pagination-current-btn" id="paginationCurrentBtn"
+          onclick="openInlinePageJump()">
+          {{ page }} / {{ total_pages }}
+        </button>
+
+        <div class="pagination-jump-edit">
+          <input type="number" id="paginationJumpInput" class="pagination-jump-input-inline" min="1"
+            max="{{ total_pages }}" value="{{ page }}" onkeydown="handleInlinePageJumpKey(event)">
+          <span class="pagination-jump-total">/ {{ total_pages }}</span>
+        </div>
+      </div>
+
+      <a href="{{ '/admin/members?page=' ~ (page + 1) ~ '&keyword=' ~ keyword ~ '&role=' ~ role ~ '&sort=' ~ sort ~ '&order=' ~ order ~ '&header_sorted=' ~ ('1' if request.args.get('header_sorted') == '1' else '') if page < total_pages else '#' }}"
+        class="page-btn js-page-transition-link {% if page >= total_pages %}disabled{% endif %}">
+        다음
+      </a>
+    </div>
+  </div>
+  {% endif %}
+</section>
+
+<div id="pageTransitionOverlay" class="page-transition-overlay"></div>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+  let pageTransitionRunning = false;
+
+  function resetPageTransitionState() {
+    pageTransitionRunning = false;
+
+    const overlay = document.getElementById('pageTransitionOverlay');
+    const shell = document.querySelector('.dashboard-shell');
+
+    if (overlay) {
+      overlay.classList.remove('show');
+    }
+
+    if (shell) {
+      shell.classList.remove('page-leaving');
+    }
+  }
+
+  window.addEventListener('pageshow', function (event) {
+    resetPageTransitionState();
+  });
+
+  document.addEventListener('DOMContentLoaded', function () {
+    resetPageTransitionState();
+  });
+
+  function runPageTransition(href) {
+    if (!href || pageTransitionRunning) return;
+
+    pageTransitionRunning = true;
+
+    const shell = document.querySelector('.dashboard-shell');
+    const overlay = document.getElementById('pageTransitionOverlay');
+
+    if (overlay) overlay.classList.add('show');
+    if (shell) shell.classList.add('page-leaving');
+
+    setTimeout(() => {
+      window.location.href = href;
+    }, 160);
+  }
+
+  function openInlinePageJump() {
+    const box = document.getElementById('paginationJumpBox');
+    const input = document.getElementById('paginationJumpInput');
+    if (!box || !input) return;
+
+    box.classList.add('editing');
+
+    requestAnimationFrame(() => {
+      input.focus();
+      input.select();
+    });
+  }
+
+  function closeInlinePageJump() {
+    const box = document.getElementById('paginationJumpBox');
+    const input = document.getElementById('paginationJumpInput');
+    if (!box || !input) return;
+
+    box.classList.remove('editing');
+    input.value = {{ page }};
+  }
+
+  function submitPageJump() {
+    const input = document.getElementById('paginationJumpInput');
+    if (!input) return;
+
+    const totalPages = {{ total_pages }};
+  let targetPage = parseInt(input.value, 10);
+
+  if (isNaN(targetPage)) {
+    targetPage = {{ page }};
+    }
+
+  if (targetPage < 1) targetPage = 1;
+  if (targetPage > totalPages) targetPage = totalPages;
+
+  const url = `/admin/members?page=${targetPage}&keyword={{ keyword }}&role={{ role }}&sort={{ sort }}&order={{ order }}&header_sorted={{ '1' if request.args.get('header_sorted') == '1' else '' }}`;
+
+  const box = document.getElementById('paginationJumpBox');
+  if (box) box.classList.remove('editing');
+
+  runPageTransition(url);
+  }
+
+  function handleInlinePageJumpKey(event) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      submitPageJump();
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeInlinePageJump();
+    }
+  }
+
+  function buildMemberSortUrl(sortKey) {
+    const currentSort = '{{ sort or "" }}';
+    const currentOrder = '{{ order or "asc" }}';
+    const hasExplicitSort = {{ 'true' if request.args.get('sort') else 'false' }};
+
+  let nextOrder = 'asc';
+
+  if (hasExplicitSort && currentSort === sortKey) {
+    nextOrder = currentOrder === 'asc' ? 'desc' : 'asc';
+  } else {
+    nextOrder = 'asc';
+  }
+
+  return `/admin/members?page={{ page }}&keyword={{ keyword }}&role={{ role }}&sort=${sortKey}&order=${nextOrder}&header_sorted=1`;
+  }
+
+  document.addEventListener('click', function (event) {
+    const th = event.target.closest('th[data-sort]');
+    if (!th) return;
+
+    const sortKey = th.dataset.sort;
+    if (!sortKey) return;
+
+    const url = buildMemberSortUrl(sortKey);
+    runPageTransition(url);
+  });
+
+  document.addEventListener('click', function (e) {
+    const link = e.target.closest('.js-page-transition-link');
+    if (!link) return;
+
+    const href = link.getAttribute('href');
+    if (!href) return;
+
+    if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button !== 0) {
+      return;
+    }
+
+    const currentUrl = new URL(window.location.href);
+    const nextUrl = new URL(href, window.location.origin);
+
+    if (currentUrl.pathname === nextUrl.pathname && currentUrl.search === nextUrl.search) {
+      return;
+    }
+
+    e.preventDefault();
+    runPageTransition(href);
+  });
+
+  document.addEventListener('click', function (event) {
+    const box = document.getElementById('paginationJumpBox');
+    if (!box) return;
+
+    if (!box.contains(event.target)) {
+      closeInlinePageJump();
+    }
+  });
+
+  document.addEventListener('DOMContentLoaded', function () {
+    const input = document.getElementById('paginationJumpInput');
+    if (input) {
+      input.addEventListener('blur', function () {
+        setTimeout(() => {
+          closeInlinePageJump();
+        }, 120);
+      });
+    }
+  });
+</script>
+{% endblock %}

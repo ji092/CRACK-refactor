@@ -1,0 +1,1142 @@
+{% extends "admin_layout.html" %}
+
+{% block title %}CRACK 회원 상세{% endblock %}
+
+{% block account_area %}
+<div class="account-chip">
+  <strong>{{ session.get('user_name', '관리자') }}님</strong>
+  <span>{{ session.get('role', 'admin') }}</span>
+</div>
+<a href="/logout" class="logout-pill">로그아웃</a>
+{% endblock %}
+
+{% block extra_style %}
+<style>
+  .member-layout {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1.72fr 0.98fr;
+    gap: 18px;
+  }
+
+  .member-main,
+  .member-side {
+    min-height: 0;
+  }
+
+  .member-main {
+    display: grid;
+    grid-template-rows: 176px 1fr;
+    gap: 16px;
+  }
+
+  .member-info-grid {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .member-side {
+    display: grid;
+    grid-template-rows: 268px 1fr;
+    /* [FIX] 활동 요약 카드가 잘리지 않도록 높이 상향 조정 (198px -> 268px) */
+    gap: 16px;
+  }
+
+  .member-profile-card,
+  .stats-card,
+  .risk-card,
+  .summary-card,
+  .activity-card {
+    background: #ffffff;
+    border: 1px solid #e5ebf2;
+    border-radius: 20px;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .member-profile-card {
+    padding: 22px 24px 16px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .member-profile-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    height: 4px;
+    background: linear-gradient(90deg, #ff7a1a 0%, #ffb37a 100%);
+  }
+
+  .member-profile-top {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    padding-top: 8px;
+  }
+
+  .member-back-btn {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    z-index: 2;
+  }
+
+  .back-btn,
+  .member-edit-btn,
+  .member-save-btn,
+  .member-cancel-btn,
+  .member-suspend-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 999px;
+    background: #f8fafc;
+    border: 1px solid #dbe3ec;
+    color: #334155;
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.18s ease;
+  }
+
+  .back-btn:hover,
+  .member-edit-btn:hover,
+  .member-save-btn:hover,
+  .member-cancel-btn:hover,
+  .member-suspend-btn:hover {
+    background: #ffffff;
+    border-color: #cbd5e1;
+    transform: translateY(-1px);
+  }
+
+  .member-suspend-btn.danger {
+    background: #fff7ed;
+    border-color: #fed7aa;
+    color: #c2410c;
+    border-radius: 10px;
+  }
+
+  .member-suspend-btn.danger:hover {
+    background: #ffedd5;
+    border-color: #fdba74;
+  }
+
+  .member-edit-btn,
+  .member-save-btn,
+  .member-cancel-btn {
+    border-radius: 10px;
+  }
+
+  .member-profile-name-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .member-profile-identity {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .member-profile-name {
+    font-size: 38px;
+    font-weight: 900;
+    color: #0f172a;
+    letter-spacing: -1.2px;
+    line-height: 1;
+  }
+
+  .member-profile-id {
+    font-size: 18px;
+    font-weight: 800;
+    color: #64748b;
+    line-height: 1;
+  }
+
+  .member-profile-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    row-gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .member-profile-chip {
+    display: inline-flex;
+    align-items: center;
+    height: 32px;
+    padding: 0 13px;
+    border-radius: 999px;
+    background: #f8fafc;
+    border: 1px solid #dbe4ee;
+    color: #334155;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .member-profile-edit-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 2px;
+  }
+
+  .member-role-edit-form,
+  .member-status-edit-wrap,
+  .member-inline-form {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 0;
+  }
+
+  .member-role-select {
+    height: 32px;
+    min-width: 110px;
+    padding: 0 10px;
+    border: 1px solid #d7dde5;
+    border-radius: 10px;
+    background: #fff;
+    color: #334155;
+    font-size: 12px;
+    font-weight: 800;
+    outline: none;
+  }
+
+  .member-role-select:focus {
+    border-color: #c9d3df;
+    box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.12);
+  }
+
+  .status-inactive {
+    background: #fef2f2;
+    color: #dc2626;
+  }
+
+  .stats-card,
+  .risk-card,
+  .summary-card,
+  .activity-card {
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .activity-card {
+    background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+  }
+
+  .risk-card {
+    background: linear-gradient(180deg, #ffffff 0%, #fcfdff 100%);
+    border-color: #dfe7f0;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
+  }
+
+  .stats-card-head,
+  .risk-card-head,
+  .summary-card-head,
+  .section-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .stats-card-title,
+  .risk-card-title,
+  .summary-card-title,
+  .section-card-title {
+    font-size: 15px;
+    font-weight: 900;
+    color: #0f172a;
+    letter-spacing: -0.3px;
+  }
+
+  .summary-card-badge,
+  .section-card-count {
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 800;
+    color: #64748b;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 999px;
+    padding: 6px 10px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .stats-grid,
+  .risk-grid,
+  .summary-grid {
+    display: grid;
+    gap: 10px;
+    flex: 1;
+    min-height: 0;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .stats-item,
+  .risk-item,
+  .summary-item {
+    border-radius: 16px;
+    padding: 14px 14px 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 104px;
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .stats-item.received {
+    background: linear-gradient(180deg, #fff7ed 0%, #fffbf7 100%);
+    border-color: #fed7aa;
+  }
+
+  .stats-item.processing {
+    background: linear-gradient(180deg, #fffbeb 0%, #fffef7 100%);
+    border-color: #fde68a;
+  }
+
+  .stats-item.completed {
+    background: linear-gradient(180deg, #f0fdf4 0%, #f7fef9 100%);
+    border-color: #bbf7d0;
+  }
+
+  .stats-item.rejected {
+    background: linear-gradient(180deg, #f8fafc 0%, #fbfdff 100%);
+    border-color: #dbe4ee;
+  }
+
+  .risk-item.avg {
+    background: linear-gradient(180deg, #f8fafc 0%, #fbfdff 100%);
+    border-color: #dbe4ee;
+  }
+
+  .risk-item.high {
+    background: linear-gradient(180deg, #fef2f2 0%, #fff8f8 100%);
+    border-color: #fecaca;
+  }
+
+  .risk-item.medium {
+    background: linear-gradient(180deg, #fff7ed 0%, #fffbf7 100%);
+    border-color: #fed7aa;
+  }
+
+  .risk-item.low {
+    background: linear-gradient(180deg, #ecfdf5 0%, #f7fef9 100%);
+    border-color: #bbf7d0;
+  }
+
+  .summary-item.date {
+    background: linear-gradient(180deg, #f8fafc 0%, #fbfdff 100%);
+  }
+
+  .summary-item.grouped {
+    background: linear-gradient(180deg, #fff7ed 0%, #fffbf7 100%);
+    border-color: #fed7aa;
+  }
+
+  .summary-item.avg {
+    background: linear-gradient(180deg, #f0fdf4 0%, #f7fef9 100%);
+    border-color: #bbf7d0;
+  }
+
+  .summary-item.reject {
+    background: linear-gradient(180deg, #fef2f2 0%, #fff8f8 100%);
+    border-color: #fecaca;
+  }
+
+  .stats-label,
+  .risk-label,
+  .summary-label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    font-weight: 800;
+    color: #475569;
+    letter-spacing: -0.2px;
+    line-height: 1.2;
+    min-height: 16px;
+  }
+
+  .stats-dot,
+  .risk-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    flex-shrink: 0;
+  }
+
+  .stats-item.received .stats-dot {
+    background: #f97316;
+  }
+
+  .stats-item.processing .stats-dot {
+    background: #d97706;
+  }
+
+  .stats-item.completed .stats-dot {
+    background: #16a34a;
+  }
+
+  .stats-item.rejected .stats-dot {
+    background: #94a3b8;
+  }
+
+  .risk-item.high .risk-dot {
+    background: #dc2626;
+  }
+
+  .risk-item.medium .risk-dot {
+    background: #ea580c;
+  }
+
+  .risk-item.low .risk-dot {
+    background: #16a34a;
+  }
+
+  .risk-item.avg .risk-dot {
+    background: #64748b;
+  }
+
+  .stats-value,
+  .risk-value,
+  .summary-value {
+    margin-top: 10px;
+    font-size: 32px;
+    font-weight: 900;
+    letter-spacing: -0.9px;
+    line-height: 1;
+    color: #0f172a;
+  }
+
+  .stats-item.received .stats-value {
+    color: #f97316;
+  }
+
+  .stats-item.processing .stats-value {
+    color: #d97706;
+  }
+
+  .stats-item.completed .stats-value {
+    color: #16a34a;
+  }
+
+  .stats-item.rejected .stats-value {
+    color: #64748b;
+  }
+
+  .risk-item.high .risk-value {
+    color: #dc2626;
+  }
+
+  .risk-item.medium .risk-value {
+    color: #ea580c;
+  }
+
+  .risk-item.low .risk-value {
+    color: #16a34a;
+  }
+
+  .risk-item.avg .risk-value {
+    color: #475569;
+  }
+
+  .summary-item.grouped .summary-value {
+    color: #ea580c;
+  }
+
+  .summary-item.avg .summary-value {
+    color: #16a34a;
+  }
+
+  .summary-item.reject .summary-value {
+    color: #dc2626;
+  }
+
+  .stats-sub,
+  .risk-sub {
+    margin-top: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748b;
+    letter-spacing: -0.2px;
+    line-height: 1.4;
+  }
+
+  .post-list {
+    display: grid;
+    grid-template-rows: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .post-item {
+    display: block;
+    height: 100%;
+    text-decoration: none;
+    color: inherit;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 12px 13px;
+    transition: all 0.16s ease;
+  }
+
+  .post-item:hover {
+    background: #ffffff;
+    border-color: #cfd8e3;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.05);
+  }
+
+  .post-item-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .post-title {
+    font-size: 14px;
+    font-weight: 900;
+    color: #111827;
+    letter-spacing: -0.2px;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .post-date {
+    flex-shrink: 0;
+    font-size: 10px;
+    font-weight: 700;
+    color: #94a3b8;
+    white-space: nowrap;
+  }
+
+  .post-meta {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+
+  .mini-badge {
+    height: 22px;
+    padding: 0 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    border: 1px solid transparent;
+    line-height: 1;
+  }
+
+  .mini-risk-high {
+    background: #fef2f2;
+    color: #dc2626;
+    border-color: #fecaca;
+  }
+
+  .mini-risk-medium {
+    background: #fff7ed;
+    color: #ea580c;
+    border-color: #fed7aa;
+  }
+
+  .mini-risk-low {
+    background: #ecfdf5;
+    color: #16a34a;
+    border-color: #bbf7d0;
+  }
+
+  .mini-status-received {
+    background: #fff7ed;
+    color: #f97316;
+    border-color: #fed7aa;
+  }
+
+  .mini-status-processing {
+    background: #fffbeb;
+    color: #d97706;
+    border-color: #fde68a;
+  }
+
+  .mini-status-done {
+    background: #f0fdf4;
+    color: #16a34a;
+    border-color: #bbf7d0;
+  }
+
+  .mini-status-rejected {
+    background: #f1f5f9;
+    color: #64748b;
+    border-color: #cbd5e1;
+  }
+
+  .post-location {
+    font-size: 10px;
+    font-weight: 600;
+    color: #94a3b8;
+  }
+
+  .section-card-footer {
+    margin-top: auto;
+    padding-top: 12px;
+    padding-right: 2px;
+    padding-bottom: 2px;
+    border-top: 1px solid #edf2f7;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .section-link {
+    display: inline-flex;
+    align-items: center;
+    font-size: 12px;
+    font-weight: 800;
+    color: #ff7a1a;
+    text-decoration: none;
+    line-height: 1;
+  }
+
+  .section-link:hover {
+    color: #ea6500;
+  }
+
+  .empty-box {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 26px;
+    border: 1px dashed #d6dee8;
+    border-radius: 18px;
+    color: #94a3b8;
+    background: #fbfdff;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: -0.2px;
+  }
+
+  .page-transition-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(244, 246, 248, 0.18);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.16s ease;
+    z-index: 3000;
+  }
+
+  .page-transition-overlay.show {
+    opacity: 1;
+  }
+
+  .dashboard-shell.page-leaving {
+    opacity: 0.92;
+    transform: translateY(2px);
+  }
+
+  .confirm-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.34);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+    z-index: 4000;
+  }
+
+  .confirm-modal-backdrop.show {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .confirm-modal {
+    width: 100%;
+    max-width: 360px;
+    background: rgba(255, 255, 255, 0.96);
+    border: 1px solid #e5ebf2;
+    border-radius: 20px;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16), 0 4px 12px rgba(15, 23, 42, 0.06);
+    backdrop-filter: blur(8px);
+    padding: 22px 20px 18px;
+  }
+
+  .confirm-modal-title {
+    font-size: 18px;
+    font-weight: 900;
+    color: #0f172a;
+    letter-spacing: -0.4px;
+    margin-bottom: 10px;
+  }
+
+  .confirm-modal-message {
+    font-size: 14px;
+    line-height: 1.6;
+    color: #475569;
+    font-weight: 600;
+    margin-bottom: 18px;
+  }
+
+  .confirm-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .confirm-modal-btn {
+    height: 38px;
+    min-width: 74px;
+    padding: 0 14px;
+    border-radius: 10px;
+    border: 1px solid #d7dde5;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.18s ease;
+  }
+
+  .confirm-modal-btn.secondary {
+    background: #fff;
+    color: #334155;
+  }
+
+  .confirm-modal-btn.secondary:hover {
+    background: #f8fafc;
+    border-color: #c9d3df;
+  }
+
+  .confirm-modal-btn.primary {
+    background: #ff7a1a;
+    border-color: #ff7a1a;
+    color: #fff;
+  }
+
+  .confirm-modal-btn.primary:hover {
+    background: #ea6500;
+    border-color: #ea6500;
+  }
+
+  @media (max-width: 1100px) {
+    .member-layout {
+      grid-template-columns: 1fr;
+    }
+
+    .member-main,
+    .member-side {
+      grid-template-rows: auto;
+    }
+
+    .member-side {
+      grid-template-rows: auto auto;
+    }
+  }
+
+  @media (max-width: 900px) {
+    .member-info-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .member-profile-name-row {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 12px;
+    }
+
+    .member-profile-identity {
+      gap: 10px;
+    }
+
+    .member-profile-edit-row {
+      justify-content: flex-start;
+      margin-top: 12px;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="member-layout">
+  <div class="member-main">
+    <div class="member-profile-card">
+      <a href="/admin/members?page={{ request.args.get('page', 1) }}&keyword={{ request.args.get('keyword', '') }}&role={{ request.args.get('role', '') }}&sort={{ request.args.get('sort', 'role') }}&order={{ request.args.get('order', 'asc') }}"
+        class="back-btn member-back-btn js-page-transition-link">
+        ← 목록으로
+      </a>
+
+      <div class="member-profile-top">
+        <div class="member-profile-name-row">
+          <div class="member-profile-identity">
+            <div class="member-profile-name">{{ member.name }}</div>
+            <div class="member-profile-id">@{{ member.uid }}</div>
+
+            {% if request.args.get('edit') == '1' %}
+            <form method="post" action="/admin/members/{{ member.id }}/role" class="member-role-edit-form">
+              <select name="role" class="member-role-select">
+                <option value="user" {% if member.role=='user' %}selected{% endif %}>일반회원</option>
+                <option value="manager" {% if member.role=='manager' %}selected{% endif %}>매니저</option>
+                <option value="admin" {% if member.role=='admin' %}selected{% endif %}>관리자</option>
+              </select>
+              <button type="submit" class="member-save-btn" data-confirm-message="역할을 변경하시겠습니까?">저장</button>
+            </form>
+
+            <div class="member-status-edit-wrap">
+              {% if member.active %}
+              <form method="post" action="/admin/members/{{ member.id }}/suspend" class="member-inline-form">
+                <button type="submit" class="member-suspend-btn danger"
+                  data-confirm-message="이 회원을 정지하시겠습니까?">정지</button>
+              </form>
+              {% else %}
+              <form method="post" action="/admin/members/{{ member.id }}/unsuspend" class="member-inline-form">
+                <button type="submit" class="member-suspend-btn" data-confirm-message="이 회원의 정지를 해제하시겠습니까?">정지
+                  해제</button>
+              </form>
+              {% endif %}
+            </div>
+            {% else %}
+            {% if member.role == 'admin' %}
+            <span class="role-badge role-admin">관리자</span>
+            {% elif member.role == 'manager' %}
+            <span class="role-badge role-manager">매니저</span>
+            {% else %}
+            <span class="role-badge role-user">일반회원</span>
+            {% endif %}
+
+            {% if member.active %}
+            <span class="status-badge">활성</span>
+            {% else %}
+            <span class="status-badge status-inactive">정지</span>
+            {% endif %}
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="member-profile-meta">
+          <span class="member-profile-chip">
+            가입일 {{ member.created_at.strftime('%Y-%m-%d') if member.created_at else '-' }}
+          </span>
+
+          {% if member.role == 'manager' %}
+          <span class="member-profile-chip">
+            지역 · {{ member.manager_region if member.manager_region else '미지정' }}
+          </span>
+          {% endif %}
+
+          <span class="member-profile-chip">
+            누적 신고 {{ member_stats.total_reports or 0 }}건
+          </span>
+        </div>
+
+        <div class="member-profile-edit-row">
+          {% if request.args.get('edit') == '1' %}
+          <a href="/admin/members/{{ member.id }}?page={{ request.args.get('page', 1) }}&keyword={{ request.args.get('keyword', '') }}&role={{ request.args.get('role', '') }}&sort={{ request.args.get('sort', 'role') }}&order={{ request.args.get('order', 'asc') }}"
+            class="member-cancel-btn js-page-transition-link">
+            편집 종료
+          </a>
+          {% else %}
+          <a href="/admin/members/{{ member.id }}?edit=1&page={{ request.args.get('page', 1) }}&keyword={{ request.args.get('keyword', '') }}&role={{ request.args.get('role', '') }}&sort={{ request.args.get('sort', 'role') }}&order={{ request.args.get('order', 'asc') }}"
+            class="member-edit-btn js-page-transition-link">
+            편집
+          </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="member-info-grid">
+      <div class="stats-card">
+        <div class="stats-card-head">
+          <div class="stats-card-title">신고 상태</div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stats-item received">
+            <div class="stats-label"><span class="stats-dot"></span>접수완료</div>
+            <div class="stats-value">{{ member_stats.received_reports or 0 }}</div>
+            <div class="stats-sub">전체 신고 접수</div>
+          </div>
+
+          <div class="stats-item processing">
+            <div class="stats-label"><span class="stats-dot"></span>처리중</div>
+            <div class="stats-value">{{ member_stats.processing_reports or 0 }}</div>
+            <div class="stats-sub">관리자 검토 진행</div>
+          </div>
+
+          <div class="stats-item completed">
+            <div class="stats-label"><span class="stats-dot"></span>처리완료</div>
+            <div class="stats-value">{{ member_stats.completed_reports or 0 }}</div>
+            <div class="stats-sub">조치 완료</div>
+          </div>
+
+          <div class="stats-item rejected">
+            <div class="stats-label"><span class="stats-dot"></span>반려</div>
+            <div class="stats-value">{{ member_stats.rejected_reports or 0 }}</div>
+            <div class="stats-sub">
+              {% if (member_stats.rejected_reports or 0) > 0 %}
+              반려 이력 있음
+              {% else %}
+              반려 처리 없음
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="risk-card">
+        <div class="risk-card-head">
+          <div class="risk-card-title">주의 현황</div>
+        </div>
+
+        <div class="risk-grid">
+          <div class="risk-item avg">
+            <div class="risk-label"><span class="risk-dot"></span>미처리</div>
+            <div class="risk-value">{{ member_stats.pending_reports or 0 }}</div>
+            <div class="risk-sub">접수완료 + 처리중</div>
+          </div>
+
+          <div class="risk-item high">
+            <div class="risk-label"><span class="risk-dot"></span>고위험 미처리</div>
+            <div class="risk-value">{{ member_stats.high_risk_pending_reports or 0 }}</div>
+            <div class="risk-sub">위험도 70점 이상</div>
+          </div>
+
+          <div class="risk-item medium">
+            <div class="risk-label"><span class="risk-dot"></span>장기 미처리</div>
+            <div class="risk-value">{{ member_stats.long_pending_reports or 0 }}</div>
+            <div class="risk-sub">24시간 이상 경과</div>
+          </div>
+
+          <div class="risk-item low">
+            <div class="risk-label"><span class="risk-dot"></span>최근 7일</div>
+            <div class="risk-value">{{ member_stats.recent_7d_reports or 0 }}</div>
+            <div class="risk-sub">최근 활동량</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="member-side">
+    <div class="summary-card">
+      <div class="summary-card-head">
+        <div class="summary-card-title">활동 요약</div>
+        <div class="summary-card-badge">핵심 지표</div>
+      </div>
+
+      <div class="summary-grid">
+        <div class="summary-item avg">
+          <div class="summary-label">승인율</div>
+          <div class="summary-value">{{ member_stats.approved_rate or 0 }}%</div>
+        </div>
+
+        <div class="summary-item reject">
+          <div class="summary-label">반려율</div>
+          <div class="summary-value">{{ member_stats.rejected_rate or 0 }}%</div>
+        </div>
+
+        <div class="summary-item grouped">
+          <div class="summary-label">중복 신고율</div>
+          <div class="summary-value">{{ member_stats.duplicate_rate or 0 }}%</div>
+        </div>
+
+        <div class="summary-item date">
+          <div class="summary-label">최근 30일 활동</div>
+          <div class="summary-value">{{ member_stats.recent_30d_reports or 0 }}건</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="activity-card">
+      <div class="section-card-head">
+        <div class="section-card-title">최근 신고</div>
+        <div class="section-card-count">누적 신고 {{ member_stats.total_reports or 0 }}건</div>
+      </div>
+
+      {% if member_incidents and member_incidents|length > 0 %}
+      <div class="post-list">
+        {% for post in member_incidents %}
+        <a href="/admin/incidents?member_id={{ member.id }}" class="post-item js-page-transition-link">
+          <div class="post-item-top">
+            <div class="post-title">{{ post.title if post.title else '제목 없는 게시글' }}</div>
+            <div class="post-date">{{ post.first_created_at.strftime('%Y-%m-%d') if post.first_created_at else '-' }}
+            </div>
+          </div>
+
+          <div class="post-meta">
+            {% if post.risk_score >= 70 %}
+            <span class="mini-badge mini-risk-high">위험도 높음</span>
+            {% elif post.risk_score >= 40 %}
+            <span class="mini-badge mini-risk-medium">위험도 중간</span>
+            {% else %}
+            <span class="mini-badge mini-risk-low">위험도 낮음</span>
+            {% endif %}
+
+            {% if post.status == '접수완료' %}
+            <span class="mini-badge mini-status-received">접수완료</span>
+            {% elif post.status == '처리중' %}
+            <span class="mini-badge mini-status-processing">처리중</span>
+            {% elif post.status == '처리완료' %}
+            <span class="mini-badge mini-status-done">처리완료</span>
+            {% elif post.status == '반려' %}
+            <span class="mini-badge mini-status-rejected">반려</span>
+            {% else %}
+            <span class="mini-badge mini-status-rejected">{{ post.status }}</span>
+            {% endif %}
+
+            <span class="post-location">
+              {{ post.region_name if post.region_name else (post.location if post.location else '위치 정보 없음') }}
+            </span>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+
+      <div class="section-card-footer">
+        <a href="/admin/incidents?member_id={{ member.id }}" class="section-link js-page-transition-link">전체 보기 →</a>
+      </div>
+      {% else %}
+      <div class="empty-box">
+        등록한 게시글이 없습니다.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div id="pageTransitionOverlay" class="page-transition-overlay"></div>
+
+<div id="confirmModal" class="confirm-modal-backdrop">
+  <div class="confirm-modal">
+    <div class="confirm-modal-title">한 번 더 확인해주세요</div>
+    <div id="confirmModalMessage" class="confirm-modal-message">정말 진행하시겠습니까?</div>
+    <div class="confirm-modal-actions">
+      <button type="button" id="confirmCancelBtn" class="confirm-modal-btn secondary">취소</button>
+      <button type="button" id="confirmOkBtn" class="confirm-modal-btn primary">확인</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+  let pageTransitionRunning = false;
+  let pendingConfirmForm = null;
+
+  function runPageTransition(href) {
+    if (!href || pageTransitionRunning) return;
+
+    pageTransitionRunning = true;
+
+    const shell = document.querySelector('.dashboard-shell');
+    const overlay = document.getElementById('pageTransitionOverlay');
+
+    if (overlay) overlay.classList.add('show');
+    if (shell) shell.classList.add('page-leaving');
+
+    setTimeout(() => {
+      window.location.href = href;
+    }, 160);
+  }
+
+  document.addEventListener('click', function (e) {
+    const link = e.target.closest('.js-page-transition-link');
+    if (!link) return;
+
+    const href = link.getAttribute('href');
+    if (!href) return;
+
+    if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button !== 0) return;
+
+    const currentUrl = new URL(window.location.href);
+    const nextUrl = new URL(href, window.location.origin);
+
+    if (currentUrl.pathname === nextUrl.pathname && currentUrl.search === nextUrl.search) return;
+
+    e.preventDefault();
+    runPageTransition(href);
+  });
+
+  const confirmModal = document.getElementById('confirmModal');
+  const confirmModalMessage = document.getElementById('confirmModalMessage');
+  const confirmCancelBtn = document.getElementById('confirmCancelBtn');
+  const confirmOkBtn = document.getElementById('confirmOkBtn');
+
+  function openConfirmModal(message, form) {
+    pendingConfirmForm = form;
+    confirmModalMessage.textContent = message;
+    confirmModal.classList.add('show');
+  }
+
+  function closeConfirmModal() {
+    confirmModal.classList.remove('show');
+    pendingConfirmForm = null;
+  }
+
+  document.addEventListener('submit', function (e) {
+    const form = e.target;
+    if (!form) return;
+
+    const submitButton = document.activeElement;
+    if (!submitButton) return;
+
+    const message = submitButton.getAttribute('data-confirm-message');
+    if (!message) return;
+
+    e.preventDefault();
+    openConfirmModal(message, form);
+  });
+
+  confirmCancelBtn.addEventListener('click', closeConfirmModal);
+
+  confirmOkBtn.addEventListener('click', function () {
+    if (!pendingConfirmForm) return;
+
+    const formToSubmit = pendingConfirmForm;
+    closeConfirmModal();
+    formToSubmit.submit();
+  });
+
+  confirmModal.addEventListener('click', function (e) {
+    if (e.target === confirmModal) {
+      closeConfirmModal();
+    }
+  });
+</script>
+{% endblock %}

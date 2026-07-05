@@ -1,0 +1,2008 @@
+{% extends "admin_layout.html" %}
+
+{% block title %}CRACK 통계{% endblock %}
+
+{% block quick_actions %}
+<div class="header-quick-actions">
+  <a href="/alert" class="quick-btn alert-btn js-page-transition-link" aria-label="알림 페이지">🔔</a>
+</div>
+{% endblock %}
+
+{% block account_area %}
+<a
+  href="{{ url_for('admin.admin_member_detail', member_id=session.get('user_id')) }}"
+  class="account-chip"
+>
+  <strong>{{ session.get('user_name', '관리자') }}님</strong>
+  <span>{{ session.get('role', 'admin') }}</span>
+</a>
+<a href="/logout" class="logout-pill">로그아웃</a>
+{% endblock %}
+
+{% block extra_style %}
+<style>
+.alert-btn { color: #f59e0b; }
+.page-title-box {
+      margin-bottom: 12px;
+      padding: 10px 14px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid var(--border);
+      box-shadow: none;
+      flex-shrink: 0;
+    }
+
+    .page-title {
+      font-size: 16px;
+      font-weight: 900;
+      letter-spacing: -0.3px;
+      color: #0f172a;
+      margin-bottom: 2px;
+    }
+
+    .page-subtitle {
+      font-size: 11px;
+      color: #8a97a8;
+      font-weight: 700;
+      line-height: 1.4;
+    }
+
+    .page-title-row {
+      display: block;
+    }
+
+    .page-title-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .compare-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+      flex-shrink: 0;
+    }
+
+    .compare-card {
+      border-radius: 14px;
+      border: 1px solid #e6ecf3;
+      background: rgba(248, 250, 252, 0.82);
+      padding: 12px 14px;
+      min-height: 78px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      box-shadow: none;
+    }
+
+    .compare-label {
+      font-size: 11px;
+      font-weight: 800;
+      color: #64748b;
+      margin-bottom: 7px;
+      letter-spacing: -0.15px;
+    }
+
+    .compare-value {
+      font-size: 20px;
+      line-height: 1.1;
+      font-weight: 900;
+      color: #0f172a;
+      letter-spacing: -0.35px;
+      margin-bottom: 4px;
+    }
+
+    .compare-meta {
+      font-size: 10px;
+      line-height: 1.35;
+      color: #94a3b8;
+      font-weight: 700;
+    }
+
+    .compare-value.up {
+      color: #c2410c;
+    }
+
+    .compare-value.down {
+      color: #1d4ed8;
+    }
+
+    .compare-value.same {
+      color: #0f172a;
+    }
+
+    .trend-chart-box {
+      transition:
+        opacity 0.25s ease,
+        transform 0.25s ease;
+    }
+
+    .trend-chart-box.is-switching {
+      opacity: 0;
+      transform: translateY(8px) scale(0.98);
+    }
+
+    .compare-card.js-trend-shortcut {
+      cursor: pointer;
+      transition:
+        transform 0.18s ease,
+        border-color 0.18s ease,
+        box-shadow 0.18s ease,
+        background 0.18s ease;
+    }
+
+    .compare-card.js-trend-shortcut:hover {
+      transform: translateY(-2px);
+      border-color: #cbd5e1;
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+    }
+
+    .compare-card.js-trend-shortcut.active-shortcut {
+      background: rgba(248, 250, 252, 0.96);
+      box-shadow: none;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 14px;
+      flex-shrink: 0;
+    }
+
+    .summary-card {
+      position: relative;
+      overflow: hidden;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 14px 16px 12px;
+      min-height: 92px;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+      display: block;
+    }
+
+    .summary-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 5px;
+      background: #dbe3ec;
+    }
+
+    .summary-card.total::before {
+      background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%);
+    }
+
+    .summary-card.pending::before {
+      background: linear-gradient(90deg, #f97316 0%, #fb923c 100%);
+    }
+
+    .summary-card.danger::before {
+      background: linear-gradient(90deg, #ef4444 0%, #f87171 100%);
+    }
+
+    .summary-card.delayed::before {
+      background: linear-gradient(90deg, #8b5cf6 0%, #a78bfa 100%);
+    }
+
+    .summary-card.today::before {
+      background: linear-gradient(90deg, #0f172a 0%, #334155 100%);
+    }
+
+    .summary-card.total {
+      background: linear-gradient(180deg, #f7fbff 0%, #ffffff 100%);
+    }
+
+    .summary-card.pending {
+      background: linear-gradient(180deg, #fffaf5 0%, #ffffff 100%);
+    }
+
+    .summary-card.danger {
+      background: linear-gradient(180deg, #fff7f7 0%, #ffffff 100%);
+    }
+
+    .summary-card.delayed {
+      background: linear-gradient(180deg, #faf7ff 0%, #ffffff 100%);
+    }
+
+    .summary-card.today {
+      background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+    }
+
+    .summary-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #7b8794;
+      margin-bottom: 10px;
+    }
+
+    .summary-value {
+      font-size: 24px;
+      line-height: 1;
+      font-weight: 900;
+      letter-spacing: -0.6px;
+      color: #0f172a;
+      margin-bottom: 6px;
+    }
+
+    .summary-meta {
+      font-size: 11px;
+      color: #94a3b8;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 16px;
+      align-items: stretch;
+      flex: 1;
+      min-height: 0;
+      padding-bottom: 2px;
+    }
+
+    .panel {
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 16px;
+      box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .panel-title {
+      font-size: 20px;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+      color: #0f172a;
+      margin-bottom: 12px;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+
+    .region-section-header {
+      align-items: flex-start;
+    }
+
+    .region-header-actions {
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-end;
+      flex-shrink: 0;
+      min-width: 260px;
+      padding-top: 2px;
+    }
+
+    .trend-filter-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+      min-width: 160px;
+    }
+
+    .trend-filter-chip {
+      min-width: 44px;
+      padding: 0 14px;
+      white-space: nowrap;
+    }
+
+    .section-title-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .section-title {
+      font-size: 20px;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+      color: #0f172a;
+    }
+
+    .section-subtitle {
+      font-size: 12px;
+      color: #7a8798;
+      font-weight: 700;
+      line-height: 1.45;
+    }
+
+    .mini-filter-chip {
+      height: 30px;
+      padding: 0 12px;
+      border-radius: 999px;
+      border: 1px solid #d7dde5;
+      background: #ffffff;
+      color: #475569;
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+
+    .trend-chart-shell {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .trend-chart-box {
+      flex: 1;
+      min-height: 0;
+      border-radius: 18px;
+      border: 1px dashed #d6dee8;
+      background: linear-gradient(180deg, #fbfdff 0%, #f8fbfe 100%);
+      padding: 16px 12px 10px;
+      position: relative;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .trend-chart-box canvas {
+      width: 100% !important;
+      max-height: 260px;
+    }
+
+    .trend-summary-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .trend-summary-item {
+      border-radius: 14px;
+      border: 1px solid #e9eef5;
+      background: #f8fafc;
+      padding: 12px 14px;
+    }
+
+    .trend-summary-label {
+      font-size: 11px;
+      font-weight: 800;
+      color: #64748b;
+      margin-bottom: 8px;
+      letter-spacing: -0.15px;
+    }
+
+    .trend-summary-value {
+      font-size: 20px;
+      line-height: 1.1;
+      font-weight: 900;
+      color: #0f172a;
+      letter-spacing: -0.5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .mini-filter-chip:hover {
+      background: #f8fafc;
+      border-color: #cbd5e1;
+    }
+
+    .mini-filter-chip.active {
+      background: #0f172a;
+      border-color: #0f172a;
+      color: #ffffff;
+    }
+
+    .chart-placeholder {
+      flex: 1;
+      min-height: 0;
+      border-radius: 18px;
+      border: 1px dashed #d6dee8;
+      background: linear-gradient(180deg, #fbfdff 0%, #f8fbfe 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 22px;
+      color: #94a3b8;
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: -0.2px;
+      line-height: 1.7;
+    }
+
+    .chart-placeholder-lg {
+      min-height: 100%;
+    }
+
+    .panel-main-chart {
+      padding: 16px;
+    }
+
+    .panel-region-chart {
+      padding: 16px;
+    }
+
+    .region-chart-shell {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .region-breadcrumb {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 6px;
+      row-gap: 6px;
+    }
+
+    .region-header-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      flex-shrink: 0;
+      min-width: 260px;
+      padding-top: 2px;
+    }
+
+    .region-back-btn {
+      width: 30px;
+      height: 30px;
+      border: 1px solid #d7dde5;
+      border-radius: 999px;
+      background: #ffffff;
+      color: #475569;
+      font-size: 14px;
+      font-weight: 900;
+      line-height: 1;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.18s ease;
+      flex-shrink: 0;
+    }
+
+    .region-back-btn:hover {
+      background: #f8fafc;
+      border-color: #cbd5e1;
+      color: #0f172a;
+      transform: translateY(-1px);
+    }
+
+    .region-back-btn.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .breadcrumb-item {
+      display: inline-flex;
+      align-items: center;
+      height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      font-size: 11px;
+      font-weight: 800;
+      color: #64748b;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .breadcrumb-item.clickable {
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+
+    .breadcrumb-item.clickable:hover {
+      background: #ffffff;
+      border-color: #cbd5e1;
+      color: #0f172a;
+    }
+
+    .breadcrumb-separator {
+      font-size: 12px;
+      font-weight: 800;
+      color: #94a3b8;
+      line-height: 1;
+    }
+
+    .breadcrumb-item.active {
+      background: #0f172a;
+      border-color: #0f172a;
+      color: #ffffff;
+    }
+
+    .region-chart-body {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1.5fr) minmax(220px, 0.6fr);
+      gap: 16px;
+      overflow: hidden;
+    }
+
+    .region-chart-box {
+      min-height: 100%;
+      border-radius: 18px;
+      border: 1px dashed #d6dee8;
+      background: linear-gradient(180deg, #fbfdff 0%, #f8fbfe 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+      position: relative;
+      overflow: visible;
+    }
+
+    .chart-back-btn {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      z-index: 5;
+    }
+
+    .region-chart-box canvas {
+      width: 100% !important;
+      height: 100% !important;
+      max-height: 360px;
+    }
+
+    .region-detail-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 0;
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-right: 6px;
+      justify-content: flex-start;
+    }
+
+    .region-detail-list {
+      scrollbar-width: thin;
+      scrollbar-color: #cbd5e1 transparent;
+      scroll-behavior: smooth;
+    }
+
+    .region-detail-list::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .region-detail-list::-webkit-scrollbar-track {
+      background: transparent;
+      border-radius: 999px;
+    }
+
+    .region-detail-list::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, #dbe4ee 0%, #cbd5e1 100%);
+      border-radius: 999px;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+    }
+
+    .region-detail-list::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(180deg, #cbd5e1 0%, #b8c4d3 100%);
+      border: 2px solid transparent;
+      background-clip: padding-box;
+    }
+
+    .region-detail-footer {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 12px;
+      padding-top: 10px;
+      flex-shrink: 0;
+    }
+
+    .region-detail-page-info {
+      font-size: 12px;
+      font-weight: 800;
+      color: #64748b;
+      white-space: nowrap;
+    }
+
+    .region-detail-pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;   /* 안전하게 중앙 유지 */
+      gap: 10px;
+    }
+
+    .region-page-btn {
+      min-width: 64px;
+      height: 32px;
+      padding: 0 12px;
+      border-radius: 999px;
+      border: 1px solid #d7dde5;
+      background: #ffffff;
+      color: #475569;
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+
+    .region-page-btn:hover:not(:disabled) {
+      background: #f8fafc;
+      border-color: #cbd5e1;
+      color: #0f172a;
+      transform: translateY(-1px);
+    }
+
+    .region-page-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .region-detail-panel {
+      min-height: 0;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      border-radius: 18px;
+      border: 1px solid #e9eef5;
+      background: #fbfdff;
+      padding: 16px;
+      overflow: hidden;
+    }
+
+    .region-detail-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      flex-shrink: 0;
+    }
+
+    .region-detail-head-title {
+      font-size: 13px;
+      font-weight: 900;
+      color: #0f172a;
+      letter-spacing: -0.15px;
+    }
+
+    .region-detail-head-count {
+      font-size: 11px;
+      font-weight: 800;
+      color: #64748b;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 999px;
+      padding: 4px 8px;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .region-detail-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      min-height: 0;
+      padding: 0 18px;
+      border-radius: 14px;
+      border: 1px solid #e9eef5;
+      background: #f8fafc;
+      transition: all 0.18s ease;
+      min-height: 48px;
+      flex-shrink: 0;
+    }
+
+    .region-detail-item:hover {
+      background: #ffffff;
+      border-color: #cbd5e1;
+      transform: translateY(-1px);
+    }
+
+    .region-detail-item.is-empty {
+      background: transparent;
+      border: 1px dashed #e2e8f0;
+      pointer-events: none;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .region-detail-item.is-empty:hover {
+      background: transparent;
+      border-color: #e2e8f0;
+      transform: none;
+    }
+
+    .region-detail-item.is-empty .region-detail-name,
+    .region-detail-item.is-empty .region-detail-meta {
+      color: transparent;
+      user-select: none;
+    }
+
+    .region-detail-name {
+      font-size: 14px;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.2px;
+    }
+
+    .region-detail-meta {
+      font-size: 12px;
+      font-weight: 800;
+      color: #64748b;
+      white-space: nowrap;
+    }
+
+    .panel-side-summary {
+      padding: 16px;
+    }
+
+    .panel-side-summary .info-list {
+      flex: 1;
+      min-height: 0;
+    }
+
+    .panel-side-summary .info-item {
+      min-height: 122px;
+      justify-content: space-between;
+    }
+
+    .info-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .info-item {
+      padding: 14px 16px;
+      border-radius: 14px;
+      background: #f8fafc;
+      border: 1px solid #e9eef5;
+    }
+
+    .info-item-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: #7b8794;
+      margin-bottom: 8px;
+    }
+
+    .info-item-text {
+      font-size: 14px;
+      line-height: 1.6;
+      color: #334155;
+      font-weight: 700;
+    }
+
+    .stats-summary-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      flex: 1;
+    }
+
+    .info-item.received {
+      background: linear-gradient(180deg, #fff7ed 0%, #fffbf7 100%);
+      border-color: #fed7aa;
+    }
+
+    .info-item.processing {
+      background: linear-gradient(180deg, #fffbeb 0%, #fffef7 100%);
+      border-color: #fde68a;
+    }
+
+    .info-item.completed {
+      background: linear-gradient(180deg, #f0fdf4 0%, #f7fef9 100%);
+      border-color: #bbf7d0;
+    }
+
+    .info-item.rejected {
+      background: linear-gradient(180deg, #f8fafc 0%, #fbfdff 100%);
+      border-color: #dbe4ee;
+    }
+
+    .info-item-text {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .info-item-text strong {
+      font-size: 30px;
+      line-height: 1;
+      font-weight: 900;
+      letter-spacing: -0.8px;
+      color: #0f172a;
+    }
+
+    .info-item-title {
+      font-size: 12px;
+      font-weight: 800;
+      color: #64748b;
+      margin-bottom: 10px;
+      letter-spacing: -0.2px;
+    }
+
+    .info-item-text span {
+      font-size: 11px;
+      color: #64748b;
+      font-weight: 700;
+      line-height: 1.4;
+    }
+
+    .page-transition-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(244, 246, 248, 0.18);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.16s ease;
+      z-index: 3000;
+    }
+
+    .page-transition-overlay.show {
+      opacity: 1;
+    }
+
+    .dashboard-shell.page-leaving {
+      opacity: 0.92;
+      transition: opacity 0.12s ease;
+    }
+
+    .region-chart-body.is-switching {
+      pointer-events: none;
+    }
+
+    .region-chart-box,
+    .region-detail-panel {
+      transition:
+        opacity 0.22s ease,
+        transform 0.22s ease;
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    .region-chart-body.is-switching .region-chart-box,
+    .region-chart-body.is-switching .region-detail-panel {
+      opacity: 0;
+      transform: translateY(6px) scale(0.985);
+    }
+
+    @media (max-width: 1200px) {
+      .summary-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .content-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 1400px) {
+  .summary-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .compare-row {
+    grid-template-columns: 1fr;
+  }
+
+  .trend-summary-row {
+    grid-template-columns: 1fr;
+  }
+
+  .region-chart-body {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-summary-list {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .layout {
+    padding: 16px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .topbar-actions {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .topbar-menu {
+    margin-right: 0;
+    flex-wrap: wrap;
+  }
+
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+    .page-title-row {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+  .trend-filter-actions {
+    justify-content: flex-start;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .page-title {
+    font-size: 24px;
+  }
+
+  .section-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+    body.dashboard-enter {
+      overflow: hidden;
+    }
+
+    body.dashboard-enter .layout {
+      opacity: 0;
+      transform: scale(0.992);
+    }
+
+    body.dashboard-enter .dashboard-shell {
+      opacity: 0;
+      transform: translateY(10px) scaleY(0.985);
+      transform-origin: center top;
+      filter: blur(4px);
+      box-shadow:
+        0 10px 24px rgba(15, 23, 42, 0.05),
+        0 2px 8px rgba(15, 23, 42, 0.03);
+    }
+
+    body.dashboard-enter .dashboard-shell > * {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+
+    body.dashboard-enter-active .layout {
+      opacity: 1;
+      transform: scale(1);
+      transition:
+        opacity 0.22s ease,
+        transform 0.38s ease;
+    }
+
+    body.dashboard-enter-active .dashboard-shell {
+      opacity: 1;
+      transform: translateY(0) scaleY(1);
+      filter: blur(0);
+      box-shadow:
+        0 18px 40px rgba(15, 23, 42, 0.08),
+        0 4px 12px rgba(15, 23, 42, 0.04);
+      transition:
+        opacity 0.24s ease 0.04s,
+        transform 0.46s cubic-bezier(0.22, 1, 0.36, 1) 0.04s,
+        filter 0.28s ease 0.04s,
+        box-shadow 0.28s ease 0.04s;
+    }
+
+    body.dashboard-enter-active .dashboard-shell > * {
+      opacity: 1;
+      transform: translateY(0);
+      transition:
+        opacity 0.28s ease 0.18s,
+        transform 0.46s cubic-bezier(0.22, 1, 0.36, 1) 0.18s;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-title-box">
+          <div class="page-title-row">
+            <div class="page-title-wrap">
+              <div class="page-title">통계</div>
+              <div class="page-subtitle">
+                지역별 신고 분포와 기간별 추이를 기준별로 확인합니다.
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="compare-row">
+          <div class="compare-card js-trend-shortcut" data-range="7d">
+            <div class="compare-label">최근 7일 변호</div>
+            <div class="compare-value" id="weeklyCompareValue">-</div>
+            <div class="compare-meta" id="weeklyCompareMeta">이전 7일 대비</div>
+          </div>
+
+          <div class="compare-card js-trend-shortcut" data-range="30d">
+            <div class="compare-label">최근 30일 변화</div>
+            <div class="compare-value" id="monthlyCompareValue">-</div>
+            <div class="compare-meta" id="monthlyCompareMeta">이전 30일 대비</div>
+          </div>
+
+          <div class="compare-card js-trend-shortcut" data-range="all">
+            <div class="compare-label">최근 최고 신고일</div>
+            <div class="compare-value" id="trendCompareValue">-</div>
+            <div class="compare-meta" id="trendCompareMeta">최근 추이 기준</div>
+          </div>
+        </div>
+
+        <div class="content-grid">
+          <section class="panel panel-region-chart">
+            <div class="section-header region-section-header">
+              <div class="section-title-wrap">
+                <div class="section-title">지역별 신고 분포</div>
+                <div class="section-subtitle">전국부터 세부 지역까지 단계별로 신고 집중도를 확인합니다.</div>
+              </div>
+
+              <div class="region-header-actions">
+                <div class="region-breadcrumb">
+                  <span class="breadcrumb-item active">전국</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="region-chart-shell">
+              <div class="region-chart-body">
+                <div class="region-chart-box">
+                  <button type="button" class="region-back-btn hidden chart-back-btn" id="regionBackBtn" aria-label="상위 지역으로 이동">
+                    ←
+                  </button>
+
+                  <canvas id="regionDonutChart"></canvas>
+                </div>
+
+                <div class="region-detail-panel">
+                  <div class="region-detail-head">
+                    <span class="region-detail-head-title">상세 지역 목록</span>
+                    <span class="region-detail-head-count" id="regionDetailCount">0개</span>
+                  </div>
+
+                  <div class="region-detail-list">
+                    <div class="region-detail-item">
+                      <div class="region-detail-name">경기도</div>
+                      <div class="region-detail-meta">42건 · 32%</div>
+                    </div>
+                  </div>
+
+                  <div class="region-detail-footer">
+                    <div class="region-detail-pagination">
+                      <button type="button" class="region-page-btn" id="regionPrevBtn">이전</button>
+                      <button type="button" class="region-page-btn" id="regionNextBtn">다음</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel panel-main-chart">
+            <div class="section-header">
+              <div class="section-title-wrap">
+                <div class="section-title">기간별 신고 추이</div>
+                <div class="section-subtitle">기간별 신고 흐름과 변화</div>
+              </div>
+
+              <div class="section-actions trend-filter-actions">
+                <button type="button" class="mini-filter-chip trend-filter-chip active" data-range="7d">7일</button>
+                <button type="button" class="mini-filter-chip trend-filter-chip" data-range="30d">30일</button>
+                <button type="button" class="mini-filter-chip trend-filter-chip" data-range="all">전체</button>
+              </div>
+            </div>
+
+            <div class="trend-chart-shell">
+              <div class="trend-chart-box">
+                <canvas id="trendLineChart"></canvas>
+              </div>
+
+              <div class="trend-summary-row">
+                <div class="trend-summary-item">
+                  <div class="trend-summary-label">총 신고</div>
+                  <div class="trend-summary-value" id="trendTotalValue">42건</div>
+                </div>
+
+                <div class="trend-summary-item">
+                  <div class="trend-summary-label">일평균</div>
+                  <div class="trend-summary-value" id="trendAvgValue">6건</div>
+                </div>
+
+                <div class="trend-summary-item">
+                  <div class="trend-summary-label">최고 구간</div>
+                  <div class="trend-summary-value" id="trendPeakValue">월 12건</div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="pageTransitionOverlay" class="page-transition-overlay"></div>
+{% endblock %}
+
+{% block extra_script %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let pageTransitionRunning = false;
+    let regionDonutChart = null;
+    let trendLineChart = null;
+    let currentTrendRange = "7d";
+    let currentOtherItems = null;
+    let currentRegionPage = 1;
+    const REGION_ITEMS_PER_PAGE = 5;
+
+    function resetPageTransitionState() {
+      pageTransitionRunning = false;
+
+      const overlay = document.getElementById('pageTransitionOverlay');
+      const shell = document.querySelector('.dashboard-shell');
+
+      if (overlay) {
+        overlay.classList.remove('show');
+      }
+
+      if (shell) {
+        shell.classList.remove('page-leaving');
+      }
+    }
+
+    window.addEventListener('pageshow', function (event) {
+      resetPageTransitionState();
+    });
+
+    document.addEventListener('DOMContentLoaded', function () {
+      resetPageTransitionState();
+    });
+
+    function runPageTransition(href) {
+      if (!href || pageTransitionRunning) return;
+
+      pageTransitionRunning = true;
+
+      const shell = document.querySelector('.dashboard-shell');
+      const overlay = document.getElementById('pageTransitionOverlay');
+
+      if (overlay) {
+        overlay.classList.add('show');
+      }
+
+      if (shell) {
+        shell.classList.add('page-leaving');
+      }
+
+      setTimeout(() => {
+        window.location.href = href;
+      }, 160);
+    }
+
+    document.addEventListener('click', function (e) {
+      const link = e.target.closest('.js-page-transition-link');
+      if (!link) return;
+
+      const href = link.getAttribute('href');
+      if (!href) return;
+
+      if (
+        e.ctrlKey ||
+        e.metaKey ||
+        e.shiftKey ||
+        e.altKey ||
+        e.button !== 0
+      ) {
+        return;
+      }
+
+      const currentUrl = new URL(window.location.href);
+      const nextUrl = new URL(href, window.location.origin);
+
+      if (currentUrl.pathname === nextUrl.pathname && currentUrl.search === nextUrl.search) {
+        return;
+      }
+
+      e.preventDefault();
+      runPageTransition(href);
+    });
+
+    // ===== 1. 더미 지역 데이터 (계층 구조) =====
+const regionDataMap = {{ (region_data_map or {"all": {}}) | tojson | safe }};
+const trendDataMap = {{ (trend_data_map or {"all": {}}) | tojson | safe }};
+const statisticsSummaryData = {{ (statistics_summary or {}) | tojson | safe }};
+
+console.log("regionDataMap =", regionDataMap);
+console.log("trendDataMap =", trendDataMap);
+console.log("statisticsSummaryData =", statisticsSummaryData);
+
+// ===== 2. 현재 위치 (breadcrumb 역할) =====
+let currentPath = [];
+
+// ===== 3. 현재 노드 가져오기 =====
+function getCurrentNode() {
+  let node = regionDataMap?.all || {};
+
+  for (let key of currentPath) {
+    if (!node || typeof node !== "object") {
+      return {};
+    }
+    node = node[key] || {};
+  }
+
+  if (!node || typeof node !== "object") {
+    return {};
+  }
+
+  return node;
+}
+
+// ===== 4. 현재 레벨 데이터 변환 =====
+function getCurrentItems() {
+  // 기타 내부 보기 상태면 그 목록만 바로 반환
+  if (currentOtherItems) {
+    return {
+      visibleItems: currentOtherItems,
+      hiddenItems: []
+    };
+  }
+
+  const node = getCurrentNode();
+  let items = [];
+
+  for (let key in node) {
+    const value = node[key];
+    const displayName = key;
+
+    if (typeof value === "number") {
+      items.push({
+        sourceKey: key,
+        name: displayName,
+        count: value,
+        hasChildren: false
+      });
+    } else {
+      items.push({
+        sourceKey: key,
+        name: displayName,
+        count: getSum(value),
+        hasChildren: true
+      });
+    }
+  }
+
+  items.sort((a, b) => {
+    const percentA = a.count;
+    const percentB = b.count;
+
+    items.sort((a, b) => b.count - a.count);
+
+    return percentB - percentA;
+  });
+
+  const isNationalLevel = currentPath.length === 0;
+const isGyeonggiLevel = currentPath.length === 1 && currentPath[0] === "경기도";
+
+if (!isNationalLevel) {
+  // 경기도는 기타로 묶지 않고 전부 그대로 노출
+  if (isGyeonggiLevel) {
+    return {
+      visibleItems: items,
+      hiddenItems: []
+    };
+  }
+
+  const MAX_ITEMS = 6; // 5개 대표 + 기타 1개
+  if (items.length > MAX_ITEMS) {
+    const topItems = items.slice(0, MAX_ITEMS - 1);
+    const restItems = items.slice(MAX_ITEMS - 1);
+    const restSum = restItems.reduce((sum, item) => sum + item.count, 0);
+
+    topItems.push({
+      name: "기타",
+      count: restSum,
+      hasChildren: true,
+      isOther: true
+    });
+
+    return {
+      visibleItems: topItems,
+      hiddenItems: restItems
+    };
+  }
+}
+
+  return {
+    visibleItems: items,
+    hiddenItems: []
+  };
+}
+
+// ===== 5. 하위 합계 재귀 계산 =====
+function getSum(node) {
+  if (typeof node === "number") return node;
+
+  let sum = 0;
+  for (let key in node) {
+    sum += getSum(node[key]);
+  }
+  return sum;
+}
+
+function getChartColors(count) {
+  const baseColors = [
+    "#3b82f6",
+    "#f97316",
+    "#ef4444",
+    "#8b5cf6",
+    "#14b8a6",
+    "#eab308",
+    "#6366f1",
+    "#ec4899",
+    "#22c55e",
+    "#64748b"
+  ];
+
+  const colors = [];
+  for (let i = 0; i < count; i++) {
+    colors.push(baseColors[i % baseColors.length]);
+  }
+  return colors;
+}
+
+function destroyRegionChart() {
+  if (regionDonutChart) {
+    regionDonutChart.destroy();
+    regionDonutChart = null;
+  }
+}
+
+function destroyTrendChart() {
+  if (trendLineChart) {
+    trendLineChart.destroy();
+    trendLineChart = null;
+  }
+}
+
+function formatDiff(current, previous) {
+  if (previous === null || previous === undefined) {
+    return {
+      text: "-",
+      meta: "비교 데이터 없음",
+      className: "same"
+    };
+  }
+
+  const diff = current - previous;
+  const percent = previous > 0 ? Math.round((diff / previous) * 100) : null;
+
+  if (diff > 0) {
+    return {
+      text: `+${diff}건`,
+      meta: previous > 0 ? `${previous}건 대비 ${percent}% 증가` : `이전 기간 0건`,
+      className: "up"
+    };
+  }
+
+  if (diff < 0) {
+    return {
+      text: `${diff}건`,
+      meta: previous > 0 ? `${previous}건 대비 ${Math.abs(percent)}% 감소` : `이전 기간 0건`,
+      className: "down"
+    };
+  }
+
+  return {
+    text: "변화 없음",
+    meta: `${previous}건과 동일`,
+    className: "same"
+  };
+}
+
+function updateCompareCards() {
+  const trend7 = trendDataMap?.all?.["7d"];
+  const trend30 = trendDataMap?.all?.["30d"];
+
+  if (!trend7 || !trend30 || !Array.isArray(trend7.values) || !Array.isArray(trend30.values)) {
+    console.warn("비교 카드용 trend 데이터 부족:", trendDataMap);
+    return;
+  }
+
+  const current7 = trend7.values.reduce((sum, value) => sum + value, 0);
+  const previous7 = Array.isArray(trend7.previous_values)
+    ? trend7.previous_values.reduce((sum, value) => sum + value, 0)
+    : null;
+
+  const current30 = trend30.values.reduce((sum, value) => sum + value, 0);
+  const previous30 = Array.isArray(trend30.previous_values)
+    ? trend30.previous_values.reduce((sum, value) => sum + value, 0)
+    : null;
+
+  const weekResult = formatDiff(current7, previous7);
+  const monthResult = formatDiff(current30, previous30);
+
+  const max7 = Math.max(...trend7.values);
+  const max7Index = trend7.values.indexOf(max7);
+  const max7Label = trend7.labels[max7Index];
+
+  document.getElementById("weeklyCompareValue").textContent = weekResult.text;
+  document.getElementById("weeklyCompareMeta").textContent = previous7 !== null ? `이전 7일보다 ${weekResult.text.replace('+', '')}` : "비교 데이터 없음";
+  document.getElementById("weeklyCompareValue").className = `compare-value ${weekResult.className}`;
+
+  document.getElementById("monthlyCompareValue").textContent = monthResult.text;
+  document.getElementById("monthlyCompareMeta").textContent = previous30 !== null ? `이전 30일보다 ${monthResult.text.replace('+', '')}` : "비교 데이터 없음";
+  document.getElementById("monthlyCompareValue").className = `compare-value ${monthResult.className}`;
+
+  document.getElementById("trendCompareValue").textContent = `${max7}건`;
+  document.getElementById("trendCompareMeta").textContent = `${max7Label}에 최고치 기록`;
+  document.getElementById("trendCompareValue").className = "compare-value same";
+}
+
+const centerTextPlugin = {
+  id: "centerTextPlugin",
+  afterDraw(chart) {
+    const { ctx, chartArea } = chart;
+    if (!chartArea) return;
+
+    const centerX = (chartArea.left + chartArea.right) / 2;
+    const centerY = (chartArea.top + chartArea.bottom) / 2;
+
+    const title = chart.config.options.plugins.centerText.title || "";
+    const value = chart.config.options.plugins.centerText.value || "";
+
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    // 제목
+    ctx.fillStyle = "#64748b";
+    ctx.font = "700 13px Pretendard, Noto Sans KR, Arial, sans-serif";
+    ctx.fillText(title, centerX, centerY - 12);
+
+    // 값
+    ctx.fillStyle = "#0f172a";
+    ctx.font = "900 20px Pretendard, Noto Sans KR, Arial, sans-serif";
+    ctx.fillText(value, centerX, centerY + 14);
+
+    ctx.restore();
+  }
+};
+
+function animateRegionTransition(callback) {
+  const bodyEl = document.querySelector(".region-chart-body");
+
+  if (!bodyEl) {
+    callback();
+    return;
+  }
+
+  bodyEl.classList.add("is-switching");
+
+  setTimeout(() => {
+    callback();
+
+    requestAnimationFrame(() => {
+      bodyEl.classList.remove("is-switching");
+    });
+  }, 180);
+}
+
+function formatRegionName(name) {
+  if (!name) return "";
+
+  const aliasMap = {
+    "강원특별자치도": "강원도",
+    "전북특별자치도": "전북도",
+    "제주특별자치도": "제주도",
+    "세종특별자치시": "세종시",
+
+    "서울특별시": "서울",
+    "부산광역시": "부산",
+    "대구광역시": "대구",
+    "인천광역시": "인천",
+    "광주광역시": "광주",
+    "대전광역시": "대전",
+    "울산광역시": "울산",
+
+    "충청북도": "충북",
+    "충청남도": "충남",
+    "전라남도": "전남",
+    "경상북도": "경북",
+    "경상남도": "경남"
+  };
+
+  let shortName = aliasMap[name] || name;
+
+  // 5글자 제한
+  if (shortName.length > 5) {
+    return shortName.slice(0, 5);
+  }
+
+  return shortName;
+}
+
+// ===== 6. 화면 렌더링 =====
+function renderRegion() {
+  const { visibleItems: items, hiddenItems } = getCurrentItems();
+  console.log("현재 currentPath =", currentPath);
+  console.log("현재 node =", getCurrentNode());
+  console.log("현재 items =", items);
+
+const backBtn = document.getElementById("regionBackBtn");
+const canGoBack = currentPath.length > 0 || currentOtherItems !== null;
+
+if (backBtn) {
+  backBtn.classList.toggle("hidden", !canGoBack);
+}
+
+  // === breadcrumb ===
+  const breadcrumbEl = document.querySelector(".region-breadcrumb");
+  const breadcrumbParts = ["전국", ...currentPath];
+  if (currentOtherItems) {
+    breadcrumbParts.push("기타");
+  }
+
+breadcrumbEl.innerHTML = breadcrumbParts
+  .map((name, i) => {
+    const isLast = i === breadcrumbParts.length - 1;
+    return `
+      <span
+        class="breadcrumb-item ${isLast ? "active" : ""} ${!isLast ? "clickable" : ""}"
+        data-index="${i}"
+      >
+        ${name}
+      </span>
+    `;
+  })
+  .join('<span class="breadcrumb-separator">-</span>');
+
+  breadcrumbEl.querySelectorAll(".breadcrumb-item.clickable").forEach(item => {
+    item.addEventListener("click", () => {
+      const index = Number(item.dataset.index);
+
+      if (index === 0) {
+        currentPath = [];
+      } else {
+        currentPath = currentPath.slice(0, index);
+      }
+
+      currentOtherItems = null;
+      currentRegionPage = 1;
+      animateRegionTransition(renderRegion);
+    });
+  });
+
+if (backBtn) {
+  backBtn.onclick = () => {
+    if (currentOtherItems) {
+      currentOtherItems = null;
+    } else if (currentPath.length > 0) {
+      currentPath.pop();
+    }
+
+    currentRegionPage = 1;
+    animateRegionTransition(renderRegion);
+  };
+}
+
+  // === 리스트 ===
+  const listEl = document.querySelector(".region-detail-list");
+listEl.innerHTML = "";
+
+const detailCountEl = document.getElementById("regionDetailCount");
+if (detailCountEl) {
+  detailCountEl.textContent = `${items.length}개`;
+}
+
+const total = items.reduce((sum, item) => sum + item.count, 0);
+
+// ===== 페이징 계산 =====
+const totalPages = Math.max(1, Math.ceil(items.length / REGION_ITEMS_PER_PAGE));
+if (currentRegionPage > totalPages) {
+  currentRegionPage = totalPages;
+}
+
+const startIndex = (currentRegionPage - 1) * REGION_ITEMS_PER_PAGE;
+const endIndex = startIndex + REGION_ITEMS_PER_PAGE;
+const pagedItems = items.slice(startIndex, endIndex);
+
+// 마지막 페이지가 비면, 빈 슬롯으로 채워서 항상 5칸 유지
+while (pagedItems.length < REGION_ITEMS_PER_PAGE) {
+  pagedItems.push(null);
+}
+
+// ===== 현재 페이지 목록만 렌더링 =====
+pagedItems.forEach(item => {
+  const div = document.createElement("div");
+  div.className = "region-detail-item";
+
+  // 빈 슬롯
+  if (item === null) {
+    div.classList.add("is-empty");
+    div.innerHTML = `
+      <div class="region-detail-name">-</div>
+      <div class="region-detail-meta">-</div>
+    `;
+    listEl.appendChild(div);
+    return;
+  }
+
+  const percent = total ? Math.round((item.count / total) * 100) : 0;
+
+  div.innerHTML = `
+    <div class="region-detail-name">${formatRegionName(item.name)}</div>
+    <div class="region-detail-meta">${item.count}건 · ${percent}%</div>
+  `;
+
+  if (item.hasChildren) {
+    div.style.cursor = "pointer";
+    div.onclick = () => {
+      if (item.isOther) {
+        currentOtherItems = hiddenItems;
+      } else {
+        currentOtherItems = null;
+        currentPath.push(item.sourceKey || item.name);
+      }
+
+      currentRegionPage = 1;
+      animateRegionTransition(renderRegion);
+    };
+  }
+
+  listEl.appendChild(div);
+});
+
+// ===== 페이지 정보 / 버튼 상태 =====
+const prevBtn = document.getElementById("regionPrevBtn");
+const nextBtn = document.getElementById("regionNextBtn");
+
+if (prevBtn) {
+  prevBtn.disabled = currentRegionPage <= 1;
+  prevBtn.onclick = () => {
+    if (currentRegionPage <= 1) return;
+    currentRegionPage -= 1;
+    renderRegion();
+  };
+}
+
+if (nextBtn) {
+  nextBtn.disabled = currentRegionPage >= totalPages;
+  nextBtn.onclick = () => {
+    if (currentRegionPage >= totalPages) return;
+    currentRegionPage += 1;
+    renderRegion();
+  };
+}
+
+  // === 차트 다시 그리기 ===
+  destroyRegionChart();
+
+  const canvas = document.getElementById("regionDonutChart");
+  const ctx = canvas.getContext("2d");
+
+  const labels = items.map(item => formatRegionName(item.name));
+  const data = items.map(item => item.count);
+  const colors = getChartColors(items.length);
+
+  regionDonutChart = new Chart(ctx, {
+    type: "doughnut",
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          data: data,
+          backgroundColor: colors,
+          borderColor: "#ffffff",
+          borderWidth: 3,
+          hoverOffset: 10
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: "62%",
+      layout: {
+        padding: {
+          left: 10,
+          right: 24,
+          top: 10,
+          bottom: 10
+        }
+      },
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          xAlign: "left",
+          yAlign: "center",
+          displayColors: false,
+          backgroundColor: "rgba(15, 23, 42, 0.92)",
+          titleColor: "#ffffff",
+          bodyColor: "#ffffff",
+          padding: 10,
+          cornerRadius: 10,
+          callbacks: {
+            title: function(context) {
+              return context[0].label;
+            },
+            label: function(context) {
+              const value = context.raw || 0;
+              const percent = total ? Math.round((value / total) * 100) : 0;
+              return `${value}건 (${percent}%)`;
+            }
+          }
+        },
+        centerText: {
+          title: currentPath.length ? formatRegionName(currentPath[currentPath.length - 1]) : "전국",
+          value: `${total}건`
+        }
+      },
+      onClick: (event, elements) => {
+  if (!elements.length) return;
+
+  const index = elements[0].index;
+  const clickedItem = items[index];
+
+  console.log("[도넛 클릭]", clickedItem);
+  console.log("[현재 node]", getCurrentNode());
+
+  if (!clickedItem) return;
+
+  if (clickedItem.isOther) {
+    currentOtherItems = hiddenItems;
+    currentRegionPage = 1;
+    animateRegionTransition(renderRegion);
+    return;
+  }
+
+  if (!clickedItem.hasChildren) return;
+
+  currentOtherItems = null;
+  currentPath.push(clickedItem.sourceKey || clickedItem.name);
+  currentRegionPage = 1;
+  animateRegionTransition(renderRegion);
+}
+    },
+    plugins: [centerTextPlugin]
+  });
+}
+
+function renderTrendChart(range = currentTrendRange) {
+  currentTrendRange = range;
+
+  const trend = trendDataMap?.all?.[range];
+  if (!trend || !Array.isArray(trend.labels) || !Array.isArray(trend.values) || !trend.values.length) {
+    console.warn("trend 데이터 없음:", range, trendDataMap);
+    return;
+  }
+
+  console.log("range:", range);
+  console.log("trend:", trend);
+
+  destroyTrendChart();
+
+  const canvas = document.getElementById("trendLineChart");
+  const ctx = canvas.getContext("2d");
+
+  const total = trend.values.reduce((sum, value) => sum + value, 0);
+  const avg = Math.round(total / trend.values.length);
+  const peak = Math.max(...trend.values);
+  const peakIndex = trend.values.indexOf(peak);
+  const peakLabel = trend.labels[peakIndex];
+
+  trendLineChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: trend.labels,
+      datasets: [
+        {
+          label: "신고 수",
+          data: trend.values,
+          borderColor: "#3b82f6",
+          backgroundColor: "rgba(59, 130, 246, 0.12)",
+          fill: true,
+          tension: 0.35,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          pointBackgroundColor: "#3b82f6",
+          pointBorderColor: "#ffffff",
+          pointBorderWidth: 2
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          displayColors: false,
+          backgroundColor: "rgba(15, 23, 42, 0.92)",
+          titleColor: "#ffffff",
+          bodyColor: "#ffffff",
+          padding: 10,
+          cornerRadius: 10,
+          callbacks: {
+            label: function(context) {
+              return `${context.raw}건`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: {
+            display: false
+          },
+          ticks: {
+            color: "#64748b",
+            font: {
+              weight: "700"
+            }
+          }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: {
+            stepSize: 5,
+            color: "#64748b",
+            font: {
+              weight: "700"
+            }
+          },
+          grid: {
+            color: "rgba(148, 163, 184, 0.15)"
+          }
+        }
+      }
+    }
+  });
+
+  document.getElementById("trendTotalValue").textContent = `${total}건`;
+  document.getElementById("trendAvgValue").textContent = `${avg}건`;
+  document.getElementById("trendPeakValue").textContent = `${peak}건`;
+document.getElementById("trendPeakValue").title = `${peakLabel} ${peak}건`;
+
+  document.querySelectorAll(".trend-filter-chip").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.range === range);
+  });
+
+  syncTrendShortcutState(range);
+}
+
+function animateTrendTransition(callback) {
+  const box = document.querySelector(".trend-chart-box");
+
+  if (!box) {
+    callback();
+    return;
+  }
+
+  box.classList.add("is-switching");
+
+  setTimeout(() => {
+    callback();
+
+    requestAnimationFrame(() => {
+      box.classList.remove("is-switching");
+    });
+  }, 180);
+}
+
+function syncTrendShortcutState(range) {
+  document.querySelectorAll(".js-trend-shortcut").forEach(card => {
+    card.classList.toggle("active-shortcut", card.dataset.range === range);
+  });
+}
+
+function moveToTrendSection() {
+  const trendPanel = document.querySelector(".panel-main-chart");
+  if (!trendPanel) return;
+
+  trendPanel.scrollIntoView({
+    behavior: "smooth",
+    block: "start"
+  });
+}
+
+document.querySelectorAll(".js-trend-shortcut").forEach(card => {
+  card.addEventListener("click", () => {
+    const range = card.dataset.range;
+    if (!range) return;
+
+    animateTrendTransition(() => {
+      renderTrendChart(range);
+    });
+
+    moveToTrendSection();
+  });
+});
+
+document.querySelectorAll(".trend-filter-chip").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const range = btn.dataset.range;
+
+    animateTrendTransition(() => {
+      renderTrendChart(range);
+    });
+  });
+});
+
+// ===== 8. 최초 실행 =====
+
+const shouldRunDashboardEnter = document.referrer && document.referrer.includes("/admin/dashboard");
+
+if (shouldRunDashboardEnter) {
+  document.body.classList.add("dashboard-enter");
+  window.addEventListener("load", () => {
+    requestAnimationFrame(() => {
+      document.body.classList.add("dashboard-enter-active");
+      setTimeout(() => {
+        document.body.classList.remove("dashboard-enter");
+        document.body.classList.remove("dashboard-enter-active");
+      }, 760);
+    });
+  }, { once: true });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  try {
+    renderRegion();
+  } catch (e) {
+    console.error("renderRegion 오류:", e);
+  }
+
+  try {
+    renderTrendChart();
+  } catch (e) {
+    console.error("renderTrendChart 오류:", e);
+  }
+
+  try {
+    updateCompareCards();
+  } catch (e) {
+    console.error("updateCompareCards 오류:", e);
+  }
+});
+</script>
+{% endblock %}

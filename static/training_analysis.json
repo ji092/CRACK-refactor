@@ -1,0 +1,50 @@
+{
+    "comparison_analysis": {
+        "summary": "v6 싱크홀 통합 모델이 v5 대비 모든 주요 지표에서 성능이 향상되었으며, 대규모 데이터셋(21만장)을 통해 높은 안정성을 확보했습니다.",
+        "superior_version": "v6 (Sinkhole Integration)",
+        "model_architecture": "YOLOv8s (Small Version)",
+        "key_benefits": [
+            "mAP50 약 3.8% 향상 (0.8688 -> 0.9017)",
+            "Recall 약 4.1% 향상 (0.8075 -> 0.8484) - 미검출 위험 감소",
+            "Precision 약 0.6% 향상 (0.8296 -> 0.8355) - 오검출(False Positive) 감소",
+            "싱크홀(Sinkhole) 클래스 신규 통합 및 탐지 성공",
+            "전이 학습(Transfer Learning)을 통한 빠른 수렴 및 최적화"
+        ]
+    },
+    "dataset_statistics": {
+        "version": "v6 Integration Dataset",
+        "total_images": 215278,
+        "train_images": 193848,
+        "val_images": 21430,
+        "ratio": "90.04% : 9.96% (약 9:1)"
+    },
+    "versions": {
+        "v5_100_epochs": {
+            "model_type": "YOLOv8s (Small)",
+            "dataset": "full_dataset4 (기존 로드 데미지)",
+            "epochs": 100,
+            "metrics": {
+                "mAP50": 0.8688,
+                "mAP50-95": 0.6504,
+                "recall": 0.8075,
+                "precision": 0.8296
+            },
+            "training_method": "기본 데이터셋 100 에포크 완주 학습",
+            "preprocessing": "AI-Hub JSON 라벨링 데이터를 YOLO TXT 형식으로 정규화 변환, 이미지 리사이징(640x640)"
+        },
+        "v6_sinkhole_integration": {
+            "model_type": "YOLOv8s (Small)",
+            "dataset": "RoadDamage_v6_Sinkhole (통합 데이터셋)",
+            "epochs": 18,
+            "metrics": {
+                "mAP50": 0.9017,
+                "mAP50-95": 0.6528,
+                "recall": 0.8484,
+                "precision": 0.8355
+            },
+            "training_method": "v5 best.pt 가중치를 기반으로 싱크홀 데이터 추가 파인튜닝, AdamW 옵티마이저 및 고성능 배치(32) 설정",
+            "preprocessing": "18종 클래스를 5종 핵심 클래스(Pothole, Major/Minor Crack, Asset, Sinkhole)로 재매핑 및 통합 전처리"
+        }
+    },
+    "analysis_conclusion": "v6 모델은 YOLOv8s 아키텍처를 기반으로 21만 장 이상의 대규모 도로 데이터를 학습했습니다. 기존 v5의 지식을 효과적으로 유지하면서도, 클래스 간결화와 싱크홀 데이터 통합을 통해 실제 도로 환경에서의 탐지 정확도와 안정성을 크게 확보했습니다."
+}
