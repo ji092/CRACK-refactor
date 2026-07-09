@@ -407,8 +407,8 @@
         <div class="media-hero" style="position: relative;">
             {# 상태 플로팅 배지 #}
             <span class="status-floating
-                {% if detail.status == '처리 완료' %}status-done
-                {% elif detail.status == '신고 처리중' %}status-processing
+                {% if detail.status == '처리완료' %}status-done
+                {% elif detail.status == '처리중' %}status-processing
                 {% elif detail.status == '접수완료' %}status-received
                 {% elif detail.status == '반려' %}status-rejected
                 {% elif detail.status == 'AI 분석중' %}status-analyzing
@@ -477,15 +477,15 @@
             {% if is_admin %}
             <div class="status-dropdown-wrap">
                 <button onclick="toggleDetailStatusDropdown(event)"
-                    class="detail-status-btn {% if detail.status == '처리 완료' %}status-done{% elif detail.status == '신고 처리중' %}status-processing{% elif detail.status == '접수완료' %}status-received{% elif detail.status == '반려' %}status-rejected{% elif detail.status == 'AI 분석중' %}status-analyzing{% else %}status-default{% endif %}">
+                    class="detail-status-btn {% if detail.status == '처리완료' %}status-done{% elif detail.status == '처리중' %}status-processing{% elif detail.status == '접수완료' %}status-received{% elif detail.status == '반려' %}status-rejected{% elif detail.status == 'AI 분석중' %}status-analyzing{% else %}status-default{% endif %}">
                     {{ detail.status }} <i class="bi bi-chevron-down" style="font-size: 0.7rem; margin-left: 2px;"></i>
                 </button>
                 <div id="detailStatusDropdown" class="status-dropdown-menu">
                     <div onclick="updateStatusFromDetail('관리자 확인중')" class="dropdown-item" style="color:#607D8B;">관리자 확인
                     </div>
                     <div onclick="updateStatusFromDetail('접수완료')" class="dropdown-item">접수완료</div>
-                    <div onclick="updateStatusFromDetail('신고 처리중')" class="dropdown-item">처리중</div>
-                    <div onclick="updateStatusFromDetail('처리 완료')" class="dropdown-item" style="color:#2E7D32;">처리 완료
+                    <div onclick="updateStatusFromDetail('처리중')" class="dropdown-item">처리중</div>
+                    <div onclick="updateStatusFromDetail('처리완료')" class="dropdown-item" style="color:#2E7D32;">처리 완료
                     </div>
                     <div onclick="updateStatusFromDetail('반려')" class="dropdown-item reject-item">반려</div>
                     <div onclick="reAnalyzeAI()" class="dropdown-item"

@@ -164,13 +164,18 @@ def find_password():
 def reset_pw():
     data = request.get_json()
     username = data.get('username')
+    email = data.get('email')
     new_password = data.get('password')
 
-    user = Member.query.filter_by(username=username).first()
+    # [보안] 아이디만으로 비밀번호를 바꿀 수 없도록, 아이디+이메일이 모두 일치하는 경우에만 재설정 허용
+    # (find-pw와 동일한 본인 확인 기준을 서버에서도 재검증 — 클라이언트 우회 방지)
+    if not username or not email or not new_password:
+        return jsonify({'success': False, 'message': '필수 정보(아이디/이메일/새 비밀번호)가 누락되었습니다.'}), 400
+
+    user = Member.query.filter_by(username=username, email=email).first()
     if user:
-        # 새로운 비밀번호 해싱 후 저장
         user.password_hash = generate_password_hash(new_password)
         db.session.commit()
         return jsonify({'success': True, 'message': '비밀번호가 성공적으로 변경되었습니다.'})
 
-    return jsonify({'success': False, 'message': '사용자를 찾을 수 없습니다.'})
+    return jsonify({'success': False, 'message': '일치하는 회원 정보가 없습니다.'}), 400

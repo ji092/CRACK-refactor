@@ -20,7 +20,7 @@ def mypage():
         return redirect(url_for('auth.logout'))
         
     my_report_count = Report.query.filter_by(user_id=user_id).count()
-    completed_count = Report.query.filter_by(user_id=user_id, status='처리 완료').count()
+    completed_count = Report.query.filter_by(user_id=user_id, status='처리완료').count()
     settings = UserSettings.query.filter_by(user_id=user_id).first()
     notification_enabled = settings.notification_enabled if settings else True
     point_logs = PointLog.query.filter_by(user_id=user_id).order_by(PointLog.created_at.desc()).all()

@@ -28,7 +28,8 @@ def upload_file():
         return jsonify({'success': False, 'message': '선택된 파일이 없습니다.'}), 400
 
     print(f"[UPLOAD] Original filename: '{file.filename}'")
-    saved = save_upload(file)
+    # base_dir을 앱 루트로 고정 (ai_core의 분석 경로 기준과 일치시켜 CWD 의존성 제거)
+    saved = save_upload(file, base_dir=current_app.root_path)
 
     if not saved['ok']:
         print(f"[UPLOAD] REJECTED: filename='{saved['filename']}', ext='{saved['ext']}' not in allowed list")
@@ -72,12 +73,17 @@ def submit_report():
     latitude = request.form.get('latitude')
     longitude = request.form.get('longitude')
     address = request.form.get('address')
+    # 제보 유형: 'road'(포트홀/싱크홀, 기본값) 또는 'drain'(배수구/우수관 막힘)
+    category = request.form.get('category', 'road')
+    if category not in ('road', 'drain'):
+        category = 'road'
 
     file_path = None
     file_type = None
 
     if 'file' in request.files and request.files['file'].filename != '':
-        saved = save_upload(request.files['file'])
+        # base_dir을 앱 루트로 고정 (ai_core의 분석 경로 기준과 일치)
+        saved = save_upload(request.files['file'], base_dir=current_app.root_path)
         if not saved['ok']:
             return jsonify({'success': False, 'message': '이미지 또는 영상 형식이 올바르지 않습니다.'}), 400
 
@@ -103,7 +109,7 @@ def submit_report():
                 print(f"[SUBMIT] ✅ Using GPS from frontend: lat={latitude}, lng={longitude}")
 
             # [개인정보 보호] 모든 이미지의 EXIF 메타데이터를 파기하고 재저장
-            _, file_path = strip_exif_and_convert(saved['save_path'], saved['filename'])
+            _, file_path = strip_exif_and_convert(saved['save_path'], saved['filename'], base_dir=current_app.root_path)
 
     lat = sanitize_coord(latitude)
     lng = sanitize_coord(longitude)
@@ -133,7 +139,8 @@ def submit_report():
         address=address,
         file_path=file_path,
         file_type=file_type,
-        status='AI 분석중'
+        status='AI 분석중',
+        category=category
     )
     db.session.add(new_report)
     db.session.commit()
@@ -145,10 +152,10 @@ def submit_report():
         db.session.add(PointLog(user_id=user_id, amount=10, reason='신고 접수'))
         db.session.commit()
 
-    # AI 분석 트리거 (core/ai_core.py의 로직을 app에 바인딩된 래퍼로 비동기 실행)
+    # AI 분석 트리거 (core/ai_core.py의 로직을 app에 바인딩된 래퍼로 비동기 실행, category로 모델 라우팅)
     if hasattr(current_app, 'run_ai_analysis'):
         ai_func = current_app._get_current_object().run_ai_analysis
-        thread = threading.Thread(target=ai_func, args=(new_report.id, file_path, file_type))
+        thread = threading.Thread(target=ai_func, args=(new_report.id, file_path, file_type, category))
         thread.start()
 
     return jsonify({'success': True, 'message': '제보가 성공적으로 접수되어 AI 분석을 시작합니다.', 'report_id': new_report.id})

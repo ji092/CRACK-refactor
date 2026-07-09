@@ -29,11 +29,12 @@ class Report(db.Model):
     file_path = db.Column(db.String(512), nullable=True)
     file_type = db.Column(db.String(50), nullable=True)
     thumbnail_path = db.Column(db.String(512), nullable=True) # AI가 생성한 썸네일 경로
-    status = db.Column(db.String(20), default='담당자 확인중')
+    status = db.Column(db.String(20), default='관리자 확인중')
     reject_reason = db.Column(db.String(500), nullable=True)
     created_at = db.Column(db.DateTime, default=get_now_kst)
     region_name = db.Column(db.String(50), nullable=True)
     last_checked_at = db.Column(db.DateTime, nullable=True)
+    category = db.Column(db.String(20), default='road', nullable=False)  # 'road'(포트홀/싱크홀) / 'drain'(배수구/우수관 막힘)
     author = db.relationship('Member', backref=db.backref('reports', lazy=True))
 
 class AiResult(db.Model):
@@ -70,7 +71,6 @@ class Notice(db.Model):
     content = db.Column(db.Text, nullable=False)
     category = db.Column(db.String(50), default='시스템')
     author_id = db.Column(db.Integer, db.ForeignKey('members.id', ondelete='SET NULL'), nullable=True)
-    created_at = db.Column(db.DateTime, default=get_now_kst)
     created_at = db.Column(db.DateTime, default=get_now_kst)
     author = db.relationship('Member', backref=db.backref('notices', lazy=True))
 

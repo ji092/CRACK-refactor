@@ -7,6 +7,20 @@
 <!-- 로컬 공지 모달 제거 (layout.html 전역 모달 사용) -->
 
 <div class="report-form card" style="margin-bottom: 24px;">
+    <!-- 제보 유형 선택 (AI 모델 라우팅용) -->
+    <div class="form-group" style="margin-bottom: 20px;">
+        <label style="display: block; font-size: 0.9rem; font-weight: 600; margin-bottom: 8px;">제보 유형</label>
+        <div id="category-selector" style="display: flex; gap: 10px;">
+            <button type="button" class="category-btn active" data-category="road"
+                style="flex: 1; padding: 12px; border: 2px solid var(--point-orange); border-radius: 12px; background: rgba(255,140,0,0.08); font-size: 0.9rem; font-weight: 700; font-family: inherit; cursor: pointer;">
+                🕳️ 도로 파손<br><span style="font-size: 0.75rem; font-weight: 400; opacity: 0.7;">포트홀 · 싱크홀</span>
+            </button>
+            <button type="button" class="category-btn" data-category="drain"
+                style="flex: 1; padding: 12px; border: 2px solid rgba(0,0,0,0.12); border-radius: 12px; background: transparent; font-size: 0.9rem; font-weight: 700; font-family: inherit; cursor: pointer;">
+                🌧️ 배수구 막힘<br><span style="font-size: 0.75rem; font-weight: 400; opacity: 0.7;">배수구 · 우수관</span>
+            </button>
+        </div>
+    </div>
     <!--제목div 위로 올림-->
     <div class="form-group" style="margin-bottom: 20px;">
         <label style="display: block; font-size: 0.9rem; font-weight: 600; margin-bottom: 8px;">제목</label>
@@ -481,14 +495,18 @@
     }
 
     const formData = new FormData();
+    // 제보 유형 (road: 도로 파손 / drain: 배수구 막힘)
+    const selectedCategory = document.querySelector('.category-btn.active')?.dataset.category || 'road';
     // 제목이 없을 경우 자동 생성 로직 추가 (선택사항)
-    const finalTitle = title.trim() === '' ? '도로 파손 신고' : title;
+    const defaultTitle = selectedCategory === 'drain' ? '배수구 막힘 신고' : '도로 파손 신고';
+    const finalTitle = title.trim() === '' ? defaultTitle : title;
 
     formData.append('title', finalTitle);
     formData.append('content', content);
     formData.append('latitude', lat);
     formData.append('longitude', lng);
     formData.append('address', address);
+    formData.append('category', selectedCategory);
 
     // 사진/영상 파일 처리
     if (selectedFile && selectedFile.size > 0) {
@@ -880,6 +898,28 @@
     } else {
         triggerMapInit();
     }
+
+    // 제보 유형 선택 토글
+    document.querySelectorAll('.category-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.category-btn').forEach(b => {
+                b.classList.remove('active');
+                b.style.border = '2px solid rgba(0,0,0,0.12)';
+                b.style.background = 'transparent';
+            });
+            btn.classList.add('active');
+            btn.style.border = '2px solid var(--point-orange)';
+            btn.style.background = 'rgba(255,140,0,0.08)';
+
+            // 업로드 안내 문구도 유형에 맞게 변경
+            const hint = document.querySelector('#upload-placeholder span');
+            if (hint) {
+                hint.textContent = btn.dataset.category === 'drain'
+                    ? '막힌 배수구/우수관이 잘 보이도록 가까이서 찍어주세요.'
+                    : '포트홀이 잘 보이도록 가까이서 찍어주세요.';
+            }
+        });
+    });
 </script>
 
 <style>

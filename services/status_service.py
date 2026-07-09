@@ -98,7 +98,6 @@ def get_cracktalk():
 
 @status_bp.route('/api/cracktalk', methods=['POST'])
 def post_cracktalk():
-    from models import PointLog # 순환 참조 방지를 위해 여기서 import
     user_id = session.get('user_id')
     if not user_id:
         return jsonify({'success': False, 'message': '로그인이 필요합니다.'}), 401
@@ -113,17 +112,7 @@ def post_cracktalk():
     if not check_profanity(content):
         return jsonify({'success': False, 'message': '부적절한 단어가 포함되어 있습니다. 바른 말을 사용해 주세요.'}), 400
 
-    user = Member.query.get(user_id)
-    # 일반 사용자일 경우 크래커 포인트 20점 차감 (관리자는 무제한)
-    if not user.is_admin:
-        if user.points < 20:
-            return jsonify({'success': False, 'message': '보유한 크래커가 부족합니다. (20 크래커 필요)'}), 400
-        user.points -= 20
-        db.session.add(PointLog(user_id=user_id, amount=-20, reason='크랙톡 채팅 작성 (포인트 소모)'))
-    else:
-        # 관리자도 내역 확인을 위해 0점 로그 추가
-        db.session.add(PointLog(user_id=user_id, amount=0, reason='크랙톡 채팅 작성 (관리자 무료)'))
-
+    # 크랙톡 작성은 크래커(포인트) 소모 없이 자유롭게 가능 (2026-07-09 차감 기능 제거)
     new_talk = CrackTalk(author_id=user_id, content=content)
     db.session.add(new_talk)
     try:
@@ -240,8 +229,10 @@ def update_report(report_id):
             report.status = '접수완료'  # AI 재분석 전 상태 초기화
             db.session.commit()
 
+            # 제보 유형(category)을 함께 전달해 알맞은 모델로 재분석되게 함 (배수구 제보는 drain 모델로)
+            category = getattr(report, 'category', 'road') or 'road'
             ai_func = current_app._get_current_object().run_ai_analysis
-            t = Thread(target=ai_func, args=(report.id, file_path, file_type))
+            t = Thread(target=ai_func, args=(report.id, file_path, file_type, category))
             t.daemon = True
             t.start()
         except Exception as ai_err:

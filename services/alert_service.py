@@ -566,7 +566,7 @@ def update_report_status(report_id):
         if rpt.user_id:
             member = Member.query.get(rpt.user_id)
             if member:
-                if new_status == '처리 완료' and old_status != '처리 완료':
+                if new_status == '처리완료' and old_status != '처리완료':
                     member.points += 20
                     db.session.add(PointLog(user_id=rpt.user_id, amount=20, reason='신고 처리 완료 보상'))
                 elif new_status == '반려' and old_status != '반려':

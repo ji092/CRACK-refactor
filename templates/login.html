@@ -337,6 +337,8 @@ document.getElementById('reset-pw-form').addEventListener('submit', function(e) 
     e.preventDefault();
 
     const username = document.getElementById('reset-username').value;
+    // find-pw 단계에서 입력한 이메일을 함께 전송 (서버가 아이디+이메일 재검증)
+    const email = document.getElementById('find-pw-email').value;
     const password = document.getElementById('new-password').value;
     const confirm = document.getElementById('confirm-password').value;
     const msgDiv = document.getElementById('reset-pw-msg');
@@ -350,7 +352,7 @@ document.getElementById('reset-pw-form').addEventListener('submit', function(e) 
     fetch('/api/reset-pw', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 'username': username, 'password': password })
+        body: JSON.stringify({ 'username': username, 'email': email, 'password': password })
     })
     .then(res => res.json())
     .then(data => {

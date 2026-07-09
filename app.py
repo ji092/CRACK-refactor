@@ -84,6 +84,18 @@ except Exception as e:
     print(f"Error loading YOLO model: {e}")
     model = None
 
+# 배수구/우수관 모델 (파일이 존재할 때만 로드 — 없으면 배수구 제보는 관리자 수동 검토로 전환됨)
+drain_model = None
+drain_model_path = os.path.join(base_dir, 'static', 'drain_v1.pt')
+if os.path.exists(drain_model_path):
+    try:
+        drain_model = YOLO(drain_model_path)
+        print("[AI] Drain model loaded: drain_v1.pt")
+    except Exception as e:
+        print(f"Error loading drain model: {e}")
+else:
+    print("[AI] Drain model not found (static/drain_v1.pt) — 배수구 제보는 수동 검토로 처리됩니다.")
+
 # Blueprint 등록
 app.register_blueprint(auth_bp)
 app.register_blueprint(alert_bp)
@@ -150,9 +162,11 @@ def map_test():
     return render_template('map_test.html')
 
 # AI 분석 함수 바인딩: 실제 로직은 core/ai_core.py에 있음.
-# 서비스(report/status)가 current_app.run_ai_analysis(report_id, file_path, file_type)로 호출한다.
-def run_ai_analysis(report_id, file_path, file_type):
-    ai_core.run_ai_analysis(app, model, base_dir, report_id, file_path, file_type)
+# 서비스(report/status)가 current_app.run_ai_analysis(report_id, file_path, file_type, category)로 호출한다.
+# category 미전달 시 'road'로 동작해 기존 호출부와 호환된다.
+def run_ai_analysis(report_id, file_path, file_type, category='road'):
+    models = {'road': model, 'drain': drain_model}
+    ai_core.run_ai_analysis_routed(app, models, base_dir, report_id, file_path, file_type, category)
 
 app.run_ai_analysis = run_ai_analysis
 

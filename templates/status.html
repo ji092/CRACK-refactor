@@ -138,8 +138,8 @@
         </div>
         <div style="text-align: right; flex-shrink: 0; margin-left: 12px;">
             <span class="badge badge-status-text
-                {% if report.status == '처리 완료' %}status-done
-                {% elif report.status == '신고 처리중' %}status-processing
+                {% if report.status == '처리완료' %}status-done
+                {% elif report.status == '처리중' %}status-processing
                 {% elif report.status == '접수완료' %}status-received
                 {% elif report.status == '반려' %}status-rejected
                 {% elif report.status == '삭제' %}status-deleted
@@ -367,34 +367,9 @@
         const content = input.value.trim();
         if (!content) return;
 
+        // 크래커 소모 없이 바로 전송 (2026-07-09 차감 기능 제거)
         window.pendingTalkContent = content;
-
-        // 관리자인 경우 소모 없이 즉시 전송
-        if (statusIsAdmin) {
-            confirmPostTalk();
-            return;
-        }
-
-        // 일반 사용자는 확인 모달 출력
-        showTalkConfirmModal(content);
-    }
-
-    window.showTalkConfirmModal = function (content) {
-        window.pendingTalkContent = content;
-        document.body.classList.add('modal-active');
-        document.getElementById('talk-confirm-modal-overlay').style.display = 'flex';
-    }
-
-    window.closeTalkConfirmModal = function () {
-        document.body.classList.remove('modal-active');
-        document.getElementById('talk-confirm-modal-overlay').style.display = 'none';
-        window.pendingTalkContent = null;
-
-        const confirmBtn = document.getElementById('talk-confirm-btn');
-        if (confirmBtn) {
-            confirmBtn.disabled = false;
-            confirmBtn.style.opacity = '1';
-        }
+        confirmPostTalk();
     }
 
     window.openBlindModal = function (talkId, isCurrentlyBlinded) {
@@ -461,15 +436,9 @@
         const content = window.pendingTalkContent;
         if (!content) return;
 
-        const confirmBtn = document.getElementById('talk-confirm-btn');
-        if (confirmBtn) {
-            confirmBtn.disabled = true;
-            confirmBtn.style.opacity = '0.7';
-        }
-
-        closeTalkConfirmModal();
         const input = document.getElementById('talk-input');
         input.value = '';
+        window.pendingTalkContent = null;
 
         try {
             const response = await fetch('/api/cracktalk', {
@@ -480,9 +449,6 @@
             const result = await response.json();
             if (result.success) {
                 loadTalks();
-                if (typeof showToast === 'function' && !statusIsAdmin) {
-                    showToast('20 크래커가 소모되었습니다.');
-                }
             } else {
                 if (typeof showToast === 'function') showToast(result.message);
                 else alert(result.message);
@@ -571,8 +537,8 @@
 
                 // 새 클래스 및 텍스트 적용
                 badge.innerText = data.new_status;
-                if (data.new_status === '처리 완료') badge.classList.add('status-done');
-                else if (data.new_status === '신고 처리중') badge.classList.add('status-processing');
+                if (data.new_status === '처리완료') badge.classList.add('status-done');
+                else if (data.new_status === '처리중') badge.classList.add('status-processing');
                 else if (data.new_status === '접수완료') badge.classList.add('status-received');
                 else if (data.new_status === '반려') badge.classList.add('status-rejected');
                 else if (data.new_status === '삭제') badge.classList.add('status-deleted');
@@ -606,32 +572,6 @@
         </p>
         <button onclick="closeRejectModal()" class="btn-auth-solid"
             style="width:100%; padding:16px; border-radius:20px; font-weight:800; font-size: 1.1rem; box-shadow: 0 8px 20px rgba(255, 140, 0, 0.3);">확인</button>
-    </div>
-</div>
-
-<!-- 크래커 소모 확인 모달 -->
-<div id="talk-confirm-modal-overlay"
-    style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.5); z-index:100000; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
-    <div
-        style="background:white; padding:32px 24px; border-radius:32px; width:90%; max-width:340px; box-shadow:0 30px 80px rgba(0,0,0,0.3); text-align: center;">
-        <div style="margin-bottom: 20px;">
-            <div
-                style="width: 60px; height: 60px; background: rgba(255, 140, 0, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
-                <i class="bi bi-lightning-charge-fill" style="font-size: 1.8rem; color: var(--point-orange);"></i>
-            </div>
-            <h3 style="font-size: 1.3rem; color: #333; font-weight: 800;">크래커 소모 안내</h3>
-        </div>
-        <p
-            style="font-size:1.05rem; line-height:1.6; color: #444; margin-bottom:24px; word-break:keep-all; font-weight: 500;">
-            채팅을 작성하면 <br><strong style="color:var(--point-orange); font-weight: 800;">20 크래커</strong>가 소모됩니다.
-            <br>정말 작성하시겠습니까?
-        </p>
-        <div style="display: flex; gap: 12px;">
-            <button onclick="closeTalkConfirmModal()"
-                style="flex: 1; padding: 16px; border-radius: 20px; font-weight: 700; font-size: 1rem; border: 1.5px solid #eee; background: white; color: #666; cursor: pointer;">취소</button>
-            <button onclick="confirmPostTalk()" id="talk-confirm-btn"
-                style="flex: 1.5; padding: 16px; border-radius: 20px; font-weight: 800; font-size: 1.1rem; border: none; background: var(--point-orange); color: white; cursor: pointer; box-shadow: 0 8px 20px rgba(255, 140, 0, 0.3);">확인</button>
-        </div>
     </div>
 </div>
 
