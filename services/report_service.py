@@ -152,11 +152,12 @@ def submit_report():
         db.session.add(PointLog(user_id=user_id, amount=10, reason='신고 접수'))
         db.session.commit()
 
-    # AI 분석 트리거 (core/ai_core.py의 로직을 app에 바인딩된 래퍼로 비동기 실행, category로 모델 라우팅)
-    if hasattr(current_app, 'run_ai_analysis'):
-        ai_func = current_app._get_current_object().run_ai_analysis
-        thread = threading.Thread(target=ai_func, args=(new_report.id, file_path, file_type, category))
-        thread.start()
+    # AI 분석 트리거 (app.extensions['ai'] 분석기로 비동기 실행, category로 모델 라우팅)
+    # 분석기는 app.py 부팅 시 항상 등록되므로 직접 접근한다 — 미등록은 배포 버그이므로
+    # .get()으로 조용히 건너뛰지 않고 KeyError로 즉시 드러나게 한다(fail-fast).
+    analyzer = current_app.extensions['ai']
+    thread = threading.Thread(target=analyzer.analyze, args=(new_report.id, file_path, file_type, category))
+    thread.start()
 
     return jsonify({'success': True, 'message': '제보가 성공적으로 접수되어 AI 분석을 시작합니다.', 'report_id': new_report.id})
 

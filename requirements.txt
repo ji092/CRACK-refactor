@@ -12,3 +12,4 @@ opencv-python-headless==4.13.0.92
 numpy==2.4.6
 Flask-SocketIO==5.6.1
 eventlet==0.41.0
+gunicorn==23.0.0

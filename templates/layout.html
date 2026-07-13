@@ -745,8 +745,7 @@
         .btn-auth-solid:active,
         .btn-auth-outline:active,
         .login-btn:active,
-        .nav-item:active,
-        .card:active {
+        .nav-item:active {
             transform: scale(0.96);
         }
 
@@ -1312,11 +1311,22 @@
 
         let modalOriginSource = null;
 
-        function showToast(msg, duration = 3500) {
+        function showToast(msg, duration = 3500, onClick = null) {
             const toast = document.getElementById('custom-toast');
             const msgElem = document.getElementById('toast-message');
             if (msgElem) msgElem.innerText = msg;
             if (toast) {
+                // 클릭 이동 핸들러 설정/해제 (onClick 없으면 일반 토스트로 복귀)
+                toast.onclick = null;
+                if (typeof onClick === 'function') {
+                    toast.style.cursor = 'pointer';
+                    toast.onclick = function () {
+                        toast.classList.remove('active');
+                        onClick();
+                    };
+                } else {
+                    toast.style.cursor = '';
+                }
                 toast.classList.remove('active');
                 void toast.offsetWidth; // reflow
                 toast.classList.add('active');
@@ -1899,6 +1909,26 @@
             }
         })();
     </script>
+
+    {# 관리자 전용: AI 유효 판정 시 실시간 토스트 알림 (모든 화면에서 수신) #}
+    {% if session.get('is_admin') %}
+    <script>
+        (function () {
+            if (typeof io === 'undefined') return;
+            var adminSocket = io();
+            adminSocket.on('new_valid_report', function (data) {
+                if (typeof showToast !== 'function') return;
+                var loc = (data && data.location) || '위치 미상';
+                var type = (data && data.damage_type) || '파손';
+                var conf = (data && data.confidence != null) ? (' · ' + data.confidence + '%') : '';
+                var icon = (data && data.category === 'drain') ? '🌧️' : '🕳️';
+                var rid = data && data.report_id;
+                showToast(icon + ' 새 제보 접수 · ' + loc + ' (' + type + conf + ') — 눌러서 보기', 6000,
+                    rid ? function () { window.location.href = '/alert/view/' + rid; } : null);
+            });
+        })();
+    </script>
+    {% endif %}
 </body>
 
 </html>

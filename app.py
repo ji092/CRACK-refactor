@@ -1,3 +1,10 @@
+# [필수] eventlet monkey_patch를 다른 모듈 import보다 먼저 실행한다.
+# 이래야 threading.Thread(예: 비동기 AI 분석)가 green thread가 되어,
+# 스레드 내부의 socketio.emit(관리자 실시간 토스트 등)이 eventlet 이벤트 루프로 정상 전달된다.
+# (gunicorn eventlet 워커는 자동 패치하지만, python app.py 개발 서버는 이게 없으면 emit 누락)
+import eventlet
+eventlet.monkey_patch()
+
 import os
 import certifi
 from flask import Flask, render_template, session, redirect, url_for, send_from_directory, make_response
@@ -76,10 +83,23 @@ db.init_app(app)
 socketio.init_app(app)
 
 
+# 추론 디바이스 결정 (GPU 있으면 cuda, 없으면 cpu로 자동 폴백)
+try:
+    import torch
+    AI_DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+    if AI_DEVICE == 'cuda':
+        print(f"[AI] CUDA 사용 가능 — GPU 추론: {torch.cuda.get_device_name(0)}")
+    else:
+        print("[AI] CUDA 미탐지 — CPU 추론으로 동작합니다.")
+except Exception as e:
+    AI_DEVICE = 'cpu'
+    print(f"[AI] torch 로드 경고: {e} — CPU 추론으로 동작합니다.")
+
 # AI 모델 로드
 try:
     model_path = os.path.join(base_dir, 'static', 'best_merge_v2.pt')
     model = YOLO(model_path)
+    model.to(AI_DEVICE)  # GPU 상주 (추론 시 매번 옮기지 않도록)
 except Exception as e:
     print(f"Error loading YOLO model: {e}")
     model = None
@@ -90,7 +110,8 @@ drain_model_path = os.path.join(base_dir, 'static', 'drain_v1.pt')
 if os.path.exists(drain_model_path):
     try:
         drain_model = YOLO(drain_model_path)
-        print("[AI] Drain model loaded: drain_v1.pt")
+        drain_model.to(AI_DEVICE)
+        print(f"[AI] Drain model loaded: drain_v1.pt (device={AI_DEVICE})")
     except Exception as e:
         print(f"Error loading drain model: {e}")
 else:
@@ -161,26 +182,26 @@ def login_page():
 def map_test():
     return render_template('map_test.html')
 
-# AI 분석 함수 바인딩: 실제 로직은 core/ai_core.py에 있음.
-# 서비스(report/status)가 current_app.run_ai_analysis(report_id, file_path, file_type, category)로 호출한다.
-# category 미전달 시 'road'로 동작해 기존 호출부와 호환된다.
-def run_ai_analysis(report_id, file_path, file_type, category='road'):
-    models = {'road': model, 'drain': drain_model}
-    ai_core.run_ai_analysis_routed(app, models, base_dir, report_id, file_path, file_type, category)
-
-app.run_ai_analysis = run_ai_analysis
+# AI 분석기 등록 (Flask extension 패턴): 부팅 시 로드한 모델을 앱 스코프에 보유.
+# 서비스는 current_app.extensions['ai'].analyze(report_id, file_path, file_type, category)로 호출한다.
+# 실제 추론 로직은 core/ai_core.py에 있고, core는 Flask에 의존하지 않는다.
+app.extensions['ai'] = ai_core.AIAnalyzer(app, {'road': model, 'drain': drain_model}, base_dir)
 
 # 서버 실행부
+# 테이블 생성: 모듈 로드 시 1회 실행.
+# gunicorn 등 WSGI 서버로 띄우면 `if __name__ == '__main__'` 블록이 실행되지 않으므로,
+# 새 환경에서도 테이블이 생성되도록 __main__ 밖에 둔다 (이미 있으면 db.create_all()이 skip).
+with app.app_context():
+    db.create_all()
+
+# 로컬 개발 실행부. 프로덕션은 gunicorn+eventlet으로 띄운다(Dockerfile CMD 참고):
+#   gunicorn --worker-class eventlet -w 1 -b 0.0.0.0:8012 app:app
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-    # 포트 8012 유지
     print("\n" + "="*50)
-    print("🚀  CRACK SERVER v1.2.8  READY")
+    print("🚀  CRACK SERVER v1.2.8  READY (dev server)")
     print("📈  Smart Road Safety Platform")
     print("="*50 + "\n")
     # 사용자가 0.0.0.0을 브라우저에 입력하는 오류를 방지하기 위해 기본값은 127.0.0.1로 바인딩
-    # 도커 컨테이너 등 외부 접근이 필요한 환경에서는 FLASK_RUN_HOST=0.0.0.0으로 오버라이드
     host = os.getenv('FLASK_RUN_HOST', '127.0.0.1')
     # 디버그 모드는 .env의 FLASK_DEBUG=1일 때만 활성화 (배포 환경 기본값: off)
     debug_mode = os.getenv('FLASK_DEBUG', '0') == '1'

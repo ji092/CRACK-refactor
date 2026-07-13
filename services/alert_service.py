@@ -141,8 +141,9 @@ def _build_groups(items):
         item['created_at'] = _parse_dt(item.get('created_at'))
         item['risk_score'] = _safe_float(item.get('confidence'))
         item['image_path'] = item.get('thumbnail_path') or item.get('file_path') or ''
-        item['region_name'] = normalize_region_name(item.get('region_name') or item.get('content'))
-        item['location'] = item.get('region_name') or item.get('content') or '위치 정보 없음'
+        item['region_name'] = normalize_region_name(item.get('region_name') or item.get('address') or item.get('content'))
+        # 표시용 위치: 카카오 역지오코딩 주소(address) 우선 → region_name → content 순
+        item['location'] = item.get('address') or item.get('region_name') or item.get('content') or '위치 정보 없음'
         normalized.append(item)
 
     groups = []
@@ -539,10 +540,48 @@ def alert_view(report_id):
         'damage_type': ai_res.damage_type if ai_res else 'N/A'
     }
 
-    # [SECURITY POLICY] 상세 페이지 가시성 권한 제어
-    # 1. 관리자(is_admin): 지도, 첨부 동영상, 첨부 사진, AI 분석 상세 데이터를 모두 열람 가능
-    # 2. 일반 사용자: 개인정보 및 분석 데이터 보호를 위해 지도(Location) 및 기본 텍스트만 열람 가능
-    return render_template('alert_view_v2.html', detail=detail, is_admin=session.get('is_admin', False))
+    # [SECURITY POLICY] 상세 페이지 미디어(사진/영상) 가시성 권한 제어
+    # 1. 관리자(is_admin): 모두 열람 가능
+    # 2. 본인(is_author): 자신이 올린 제보의 미디어는 열람 가능
+    # 3. 그 외 일반 사용자: 다른 신고자 개인정보 보호를 위해 미디어는 잠금(지도·텍스트만)
+    user_id = session.get('user_id')
+    is_author = user_id is not None and rpt.user_id is not None and int(rpt.user_id) == int(user_id)
+    return render_template('alert_view_v2.html', detail=detail,
+                           is_admin=session.get('is_admin', False), is_author=is_author)
+
+
+@alert_bp.route('/api/admin/reanalyze/<int:report_id>', methods=['POST'])
+def reanalyze_report(report_id):
+    """관리자: 기존 AI 결과를 지우고 제보 유형(category)에 맞는 모델로 재분석."""
+    if not session.get('is_admin'):
+        return jsonify({'success': False, 'message': '권한이 없습니다.'}), 403
+
+    rpt = Report.query.get_or_404(report_id)
+    if not rpt.file_path:
+        return jsonify({'success': False, 'message': '분석할 첨부 파일이 없습니다.'}), 400
+
+    try:
+        # 기존 AI 분석 결과·영상 검출 데이터 삭제
+        AiResult.query.filter_by(report_id=report_id).delete()
+        VideoDetection.query.filter_by(report_id=report_id).delete()
+        rpt.status = 'AI 분석중'
+        rpt.reject_reason = None
+        db.session.commit()
+
+        # 제보 유형에 맞는 모델로 재분석 트리거 (drain 모델 없으면 ai_core가 '관리자 확인중'으로 자동 전환)
+        import threading
+        file_path = rpt.file_path
+        file_type = rpt.file_type or ('video' if (file_path or '').lower().endswith(('.mp4', '.mov', '.avi', '.m4v')) else 'image')
+        category = getattr(rpt, 'category', 'road') or 'road'
+        analyzer = current_app.extensions['ai']
+        t = threading.Thread(target=analyzer.analyze, args=(report_id, file_path, file_type, category))
+        t.daemon = True
+        t.start()
+
+        return jsonify({'success': True, 'message': 'AI 재분석을 시작했습니다.'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 
 @alert_bp.route('/api/admin/report/<int:report_id>/status', methods=['POST'])

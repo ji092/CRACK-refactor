@@ -230,9 +230,10 @@ def update_report(report_id):
             db.session.commit()
 
             # 제보 유형(category)을 함께 전달해 알맞은 모델로 재분석되게 함 (배수구 제보는 drain 모델로)
+            # 분석기는 부팅 시 항상 등록되므로 직접 접근 (미등록은 아래 except에서 로그로 드러남)
             category = getattr(report, 'category', 'road') or 'road'
-            ai_func = current_app._get_current_object().run_ai_analysis
-            t = Thread(target=ai_func, args=(report.id, file_path, file_type, category))
+            analyzer = current_app.extensions['ai']
+            t = Thread(target=analyzer.analyze, args=(report.id, file_path, file_type, category))
             t.daemon = True
             t.start()
         except Exception as ai_err:

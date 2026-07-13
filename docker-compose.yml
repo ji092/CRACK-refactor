@@ -6,7 +6,18 @@ services:
       - "8012:8012"
     environment:
       - FLASK_RUN_HOST=0.0.0.0
+      # GPU 가시성 (NVIDIA Container Toolkit이 참조)
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
     volumes:
       - ./secrets:/app/secrets:ro
       - ./uploads:/app/uploads
     restart: unless-stopped
+    # RTX A4000 GPU 할당 (호스트: NVIDIA 드라이버 + NVIDIA Container Toolkit 필요)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

@@ -39,6 +39,45 @@ def is_drain_class(cls_name):
     return any(k in lowered for k in DRAIN_CLASS_KEYWORDS)
 
 
+def _notify_admins_new_report(report_id, category, rpt, damage_type, confidence):
+    """AI 유효 판정 시 관리자에게 실시간 토스트 알림을 브로드캐스트한다.
+
+    모든 클라이언트에 emit되지만, 리스너는 layout.html에서 관리자에게만 렌더된다.
+    (전송 데이터는 위치·유형 등 최소 정보만 — 개인정보 노출 최소화)
+    """
+    try:
+        from extensions import socketio
+        socketio.emit('new_valid_report', {
+            'report_id': report_id,
+            'category': category,
+            'location': (getattr(rpt, 'address', None) or getattr(rpt, 'region_name', None) or '위치 정보 없음'),
+            'damage_type': damage_type,
+            'confidence': confidence,
+        }, namespace='/')
+    except Exception as e:
+        print(f"[Notify] admin toast emit error: {e}")
+
+
+class AIAnalyzer:
+    """부팅 시 로드된 YOLO 모델·경로·app을 보유하는 앱 스코프 AI 분석기.
+
+    Flask extension 패턴으로 `app.extensions['ai']`에 등록해 사용한다.
+    서비스는 `current_app.extensions['ai'].analyze(...)`로 호출 →
+    서비스가 core를 직접 import하지 않으므로 순환 import를 회피하면서
+    부팅 시 GPU에 상주시킨 모델 인스턴스를 재사용한다.
+    (core 자체는 여전히 Flask 비의존 — app/models를 인자로 받을 뿐)
+    """
+
+    def __init__(self, app, models, base_dir):
+        self.app = app
+        self.models = models  # {'road': YOLO|None, 'drain': YOLO|None}
+        self.base_dir = base_dir
+
+    def analyze(self, report_id, file_path, file_type, category=CATEGORY_ROAD):
+        run_ai_analysis_routed(self.app, self.models, self.base_dir,
+                               report_id, file_path, file_type, category)
+
+
 def run_ai_analysis_routed(app, models, base_dir, report_id, file_path, file_type, category=CATEGORY_ROAD):
     """제보 유형에 따라 알맞은 모델로 분석을 라우팅한다.
 
@@ -141,6 +180,7 @@ def run_drain_analysis(app, model, base_dir, report_id, file_path, file_type):
                     if mbr:
                         mbr.points += 10
                         db.session.add(PointLog(user_id=rpt.user_id, amount=10, reason='AI 분석 통과 (유효한 제보)'))
+                    _notify_admins_new_report(report_id, 'drain', rpt, damage_type, round(drain_max_conf * 100, 1))
                 else:
                     rpt.status = '반려'
                     if drain_count == 0:
@@ -338,6 +378,7 @@ def run_ai_analysis(app, model, base_dir, report_id, file_path, file_type):
                     if mbr:
                         mbr.points += 10
                         db.session.add(PointLog(user_id=rpt.user_id, amount=10, reason='AI 분석 통과 (유효한 제보)'))
+                    _notify_admins_new_report(report_id, 'road', rpt, damage_type, round(max_conf * 100, 1))
                 else:
                     rpt.status = '반려'
                     if total_pothole_count == 0 and sinkhole_count == 0:
