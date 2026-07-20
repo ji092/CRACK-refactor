@@ -8,6 +8,7 @@ eventlet.monkey_patch()
 import os
 import certifi
 from flask import Flask, render_template, session, redirect, url_for, send_from_directory, make_response
+from flask_socketio import join_room
 from dotenv import load_dotenv
 from ultralytics import YOLO
 
@@ -81,6 +82,16 @@ for d in [UPLOAD_IMAGE_DIR, UPLOAD_VIDEO_DIR]:
 # DB 초기화
 db.init_app(app)
 socketio.init_app(app)
+
+
+# [실시간 알림] 관리자 전용 룸(admins) 관리.
+# 소켓 연결 시 세션이 관리자인 클라이언트만 'admins' 룸에 join시켜,
+# AI 유효 판정 토스트(new_valid_report)를 관리자에게만 room 단위로 emit한다.
+# (기존 전체 브로드캐스트 대비, 페이로드가 일반 사용자 소켓으로 전달되지 않음)
+@socketio.on('connect')
+def _on_socket_connect():
+    if session.get('is_admin'):
+        join_room('admins')
 
 
 # 추론 디바이스 결정 (GPU 있으면 cuda, 없으면 cpu로 자동 폴백)

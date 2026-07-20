@@ -40,9 +40,10 @@ def is_drain_class(cls_name):
 
 
 def _notify_admins_new_report(report_id, category, rpt, damage_type, confidence):
-    """AI 유효 판정 시 관리자에게 실시간 토스트 알림을 브로드캐스트한다.
+    """AI 유효 판정 시 관리자 전용 룸(admins)으로 실시간 토스트 알림을 emit한다.
 
-    모든 클라이언트에 emit되지만, 리스너는 layout.html에서 관리자에게만 렌더된다.
+    관리자 세션만 소켓 연결 시 'admins' 룸에 join되므로(app.py의 connect 핸들러),
+    페이로드가 일반 사용자 소켓으로는 전달되지 않는다.
     (전송 데이터는 위치·유형 등 최소 정보만 — 개인정보 노출 최소화)
     """
     try:
@@ -53,7 +54,7 @@ def _notify_admins_new_report(report_id, category, rpt, damage_type, confidence)
             'location': (getattr(rpt, 'address', None) or getattr(rpt, 'region_name', None) or '위치 정보 없음'),
             'damage_type': damage_type,
             'confidence': confidence,
-        }, namespace='/')
+        }, namespace='/', to='admins')
     except Exception as e:
         print(f"[Notify] admin toast emit error: {e}")
 
