@@ -1,5 +1,4 @@
-from flask import Blueprint, render_template, session, redirect, url_for, request, jsonify, current_app
-from werkzeug.utils import secure_filename
+from flask import Blueprint, render_template, session, redirect, url_for, request, jsonify
 from extensions import db, socketio
 from models import Report, CrackTalk, Member
 from datetime import timedelta
@@ -9,7 +8,6 @@ status_bp = Blueprint('status', __name__)
 
 # [용어 정의] 상단바와 하단바를 제외한 실질적인 본문 영역을 '메인 콘텐츠 영역' 또는 '메인 영역'으로 정의합니다.
 MAIN_CONTENT_AREA = "메인 콘텐츠 영역 (Main Content Area)"
-import os
 
 def _normalize_path(path):
     if not path:
@@ -148,120 +146,3 @@ def toggle_blind_cracktalk(talk_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': '처리 중 오류가 발생했습니다.'}), 500
-
-
-# alert_edit.html에서 호출하는 내 제보 수정 API
-@status_bp.route('/api/report/<int:report_id>/update', methods=['POST'])
-def update_report(report_id):
-    from sqlalchemy import text as sa_text
-    import cv2
-
-    user_id = session.get('user_id')
-    if not user_id:
-        return jsonify({'success': False, 'message': '로그인이 필요합니다.'}), 401
-
-    report = Report.query.get_or_404(report_id)
-
-    # DB에서 직접 admin 여부 확인
-    row = db.session.execute(
-        sa_text("SELECT is_admin, role FROM members WHERE id = :uid LIMIT 1"),
-        {'uid': user_id}
-    ).mappings().first()
-
-    is_admin = False
-    if row:
-        is_admin = (row.get('is_admin') == 1) or (row.get('role') == 'admin')
-
-    # 관리자는 모든 글 수정 가능, 일반 사용자는 본인 글만
-    if not is_admin and int(report.user_id) != int(user_id):
-        return jsonify({'success': False, 'message': '권한이 없습니다.'}), 403
-
-    report.title = request.form.get('title')
-    report.content = request.form.get('content')
-
-    file = request.files.get('file')
-    if file and file.filename != '':
-        filename = secure_filename(file.filename)
-        ext = os.path.splitext(filename)[1].lower()
-        is_video = ext in ('.mp4', '.mov', '.avi', '.m4v')
-
-        # 영상/이미지 분리 저장
-        if is_video:
-            upload_dir = os.path.join(current_app.root_path, 'uploads', 'videos')
-        else:
-            upload_dir = os.path.join(current_app.root_path, 'uploads', 'images')
-
-        os.makedirs(upload_dir, exist_ok=True)
-        save_path = os.path.join(upload_dir, filename)
-        file.save(save_path)
-
-        if is_video:
-            report.file_path = f"/uploads/videos/{filename}"
-            report.file_type = 'video'
-
-            # 영상 첫 프레임을 썸네일로 추출
-            try:
-                cap = cv2.VideoCapture(save_path)
-                success, frame = cap.read()
-                cap.release()
-                if success:
-                    thumb_name = os.path.splitext(filename)[0] + '_thumb.jpg'
-                    thumb_dir = os.path.join(current_app.root_path, 'uploads', 'images')
-                    os.makedirs(thumb_dir, exist_ok=True)
-                    cv2.imwrite(os.path.join(thumb_dir, thumb_name), frame)
-                    report.thumbnail_path = f"/uploads/images/{thumb_name}"
-                else:
-                    report.thumbnail_path = report.file_path
-            except Exception:
-                report.thumbnail_path = report.file_path
-        else:
-            report.file_path = f"/uploads/images/{filename}"
-            report.file_type = 'image'
-            report.thumbnail_path = f"/uploads/images/{filename}"
-
-    try:
-        db.session.commit()
-        try:
-            from threading import Thread
-            file_path = report.file_path
-            file_type = report.file_type or (
-                'video' if (file_path or '').lower().endswith(('.mp4', '.mov', '.avi', '.m4v')) else 'image')
-            report.status = '접수완료'  # AI 재분석 전 상태 초기화
-            db.session.commit()
-
-            # 제보 유형(category)을 함께 전달해 알맞은 모델로 재분석되게 함 (배수구 제보는 drain 모델로)
-            # 분석기는 부팅 시 항상 등록되므로 직접 접근 (미등록은 아래 except에서 로그로 드러남)
-            category = getattr(report, 'category', 'road') or 'road'
-            analyzer = current_app.extensions['ai']
-            t = Thread(target=analyzer.analyze, args=(report.id, file_path, file_type, category))
-            t.daemon = True
-            t.start()
-        except Exception as ai_err:
-            print(f"[AI 재분석 오류] {ai_err}")
-
-        return jsonify({'success': True})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)})
-
-
-# alert_edit.html에서 호출하는 내 제보 삭제 API (실삭제 대신 status만 '삭제'로 변경)
-@status_bp.route('/api/report/<int:report_id>/soft-delete', methods=['POST'])
-def soft_delete_report(report_id):
-    user_id = session.get('user_id')
-    if not user_id:
-        return jsonify({'success': False, 'message': '로그인이 필요합니다.'}), 401
-
-    report = Report.query.get_or_404(report_id)
-
-    # 본인 확인
-    if int(report.user_id) != int(user_id):
-        return jsonify({'success': False, 'message': '권한이 없습니다.'}), 403
-
-    try:
-        report.status = '삭제'
-        db.session.commit()
-        return jsonify({'success': True})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)})

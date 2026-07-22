@@ -35,18 +35,6 @@ def mypage():
     )
 
 
-# 사용자가 신고 리스트를 조회하는 기능
-@my_bp.route('/my-reports')
-def my_reports():
-    user_id = session.get('user_id')
-    if not user_id:
-        return redirect(url_for('auth.login'))
-
-    # 사용자가 직접 올린 신고 리스트를 최신순으로 가져옴.
-    reports = Report.query.filter_by(user_id=user_id).order_by(Report.created_at.desc()).all()
-
-    return render_template('myreports.html', reports=reports)
-
 @my_bp.route('/api/mypage/profile', methods=['POST'])
 def update_profile():
     user_id = session.get('user_id')
