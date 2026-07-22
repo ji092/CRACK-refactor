@@ -141,10 +141,14 @@ def find_id():
 def find_password():
     data = request.get_json()
     username = data.get('username')
+    name = data.get('name')
     email = data.get('email')
 
-    # 아이디와 이메일이 모두 일치하는 유저 찾기
-    user = Member.query.filter_by(username=username, email=email).first()
+    if not username or not name or not email:
+        return jsonify({'success': False, 'message': '아이디/이름/이메일을 모두 입력해주세요.'}), 400
+
+    # 아이디, 이름(닉네임), 이메일이 모두 일치하는 유저 찾기
+    user = Member.query.filter_by(username=username, nickname=name, email=email).first()
 
     if user:
         # 보안상 실제 비밀번호를 보여줄 순 없으므로, 확인되었다는 메시지만 전달
@@ -164,15 +168,16 @@ def find_password():
 def reset_pw():
     data = request.get_json()
     username = data.get('username')
+    name = data.get('name')
     email = data.get('email')
     new_password = data.get('password')
 
-    # [보안] 아이디만으로 비밀번호를 바꿀 수 없도록, 아이디+이메일이 모두 일치하는 경우에만 재설정 허용
+    # [보안] 아이디만으로 비밀번호를 바꿀 수 없도록, 아이디+이름+이메일이 모두 일치하는 경우에만 재설정 허용
     # (find-pw와 동일한 본인 확인 기준을 서버에서도 재검증 — 클라이언트 우회 방지)
-    if not username or not email or not new_password:
-        return jsonify({'success': False, 'message': '필수 정보(아이디/이메일/새 비밀번호)가 누락되었습니다.'}), 400
+    if not username or not name or not email or not new_password:
+        return jsonify({'success': False, 'message': '필수 정보(아이디/이름/이메일/새 비밀번호)가 누락되었습니다.'}), 400
 
-    user = Member.query.filter_by(username=username, email=email).first()
+    user = Member.query.filter_by(username=username, nickname=name, email=email).first()
     if user:
         user.password_hash = generate_password_hash(new_password)
         db.session.commit()

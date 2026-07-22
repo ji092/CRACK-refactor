@@ -18,50 +18,6 @@ def report_page():
     # kakao_js_key는 context_processor에 의해 주입됨
     return render_template('report.html')
 
-@report_bp.route('/api/upload', methods=['POST'])
-def upload_file():
-    if 'file' not in request.files:
-        return jsonify({'success': False, 'message': '파일이 없습니다.'}), 400
-
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'success': False, 'message': '선택된 파일이 없습니다.'}), 400
-
-    print(f"[UPLOAD] Original filename: '{file.filename}'")
-    # base_dir을 앱 루트로 고정 (ai_core의 분석 경로 기준과 일치시켜 CWD 의존성 제거)
-    saved = save_upload(file, base_dir=current_app.root_path)
-
-    if not saved['ok']:
-        print(f"[UPLOAD] REJECTED: filename='{saved['filename']}', ext='{saved['ext']}' not in allowed list")
-        return jsonify({'success': False, 'message': f"허용되지 않는 파일 형식입니다. (감지된 확장자: {saved['ext']})"}), 400
-
-    if saved['file_type'] == 'video':
-        return jsonify({'success': True, 'message': '동영상 업로드 성공', 'path': saved['web_path']})
-
-    print(f"[UPLOAD] Image saved to: {saved['save_path']}")
-
-    # [수정] 업로드 즉시 GPS 메타데이터 추출 (프론트 유실 또는 HEIC 대비 서버 직접 추출)
-    lat, lng = extract_gps_from_exif(saved['save_path'])
-    print(f"[UPLOAD] GPS extraction result: lat={lat}, lng={lng}")
-
-    # [NaN 방어] Pillow가 NaN을 반환할 경우 JSON 직렬화 오류 방지
-    lat = sanitize_coord(lat)
-    lng = sanitize_coord(lng)
-
-    # GPS가 유효하면 즉시 역지오코딩하여 주소도 반환
-    address = None
-    if lat and lng:
-        address = reverse_geocode(lat, lng)
-        print(f"[UPLOAD] Reverse geocoded address: {address}")
-
-    return jsonify({
-        'success': True,
-        'message': '이미지 업로드 성공 (GPS 추출 시도)',
-        'path': saved['web_path'],
-        'gps': {'lat': lat, 'lng': lng} if lat and lng else None,
-        'address': address
-    })
-
 @report_bp.route('/api/report', methods=['POST'])
 def submit_report():
     if not session.get('user_id'):
@@ -160,11 +116,3 @@ def submit_report():
     thread.start()
 
     return jsonify({'success': True, 'message': '제보가 성공적으로 접수되어 AI 분석을 시작합니다.', 'report_id': new_report.id})
-
-@report_bp.route('/api/report/status/<int:report_id>', methods=['GET'])
-def get_report_status(report_id):
-    rpt = Report.query.get_or_404(report_id)
-    return jsonify({
-        'status': rpt.status,
-        'is_analyzing': rpt.status == 'AI 분석중'
-    })

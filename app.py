@@ -185,10 +185,6 @@ def index():
         
     return render_template('index.html')
 
-@app.route('/login_page')
-def login_page():
-    return redirect(url_for('auth.login'))
-
 # AI 분석기 등록 (Flask extension 패턴): 부팅 시 로드한 모델을 앱 스코프에 보유.
 # 서비스는 current_app.extensions['ai'].analyze(report_id, file_path, file_type, category)로 호출한다.
 # 실제 추론 로직은 core/ai_core.py에 있고, core는 Flask에 의존하지 않는다.

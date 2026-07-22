@@ -635,34 +635,6 @@ def delete_report(report_id):
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
-@alert_bp.route('/api/admin/notice', methods=['POST'])
-def add_notice():
-    if not session.get('is_admin'):
-        return jsonify({'success': False, 'message': '권한이 없습니다.'}), 403
-
-    data = request.get_json()
-    title = data.get('title')
-    content = data.get('content')
-    category = data.get('category', '일반')
-
-    if not title or not content:
-        return jsonify({'success': False, 'message': '제목과 내용을 입력해주세요.'}), 400
-
-    try:
-        new_notice = Notice(
-            title=title,
-            content=content,
-            category=category,
-            author_id=session.get('user_id')
-        )
-        db.session.add(new_notice)
-        db.session.commit()
-        return jsonify({'success': True, 'message': '공지사항이 등록되었습니다.'})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-
 @alert_bp.route('/api/report/<int:report_id>/detections')
 def get_video_detections(report_id):
     """동영상 프레임별 AI 검출 결과 API"""

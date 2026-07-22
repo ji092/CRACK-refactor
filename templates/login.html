@@ -62,6 +62,7 @@
 
         <form id="find-pw-form" class="modal-form">
             <input type="text" id="find-pw-username" name="username" placeholder="아이디" required>
+            <input type="text" id="find-pw-name" name="name" placeholder="이름(닉네임)" required>
             <input type="email" id="find-pw-email" name="email" placeholder="이메일" required>
             <button type="submit" class="auth-btn">비밀번호 찾기</button>
         </form>
@@ -77,7 +78,10 @@
         <div id="reset-pw-msg" style="margin-bottom: 15px; font-size: 0.85rem; text-align: center;"></div>
 
         <form id="reset-pw-form" class="modal-form">
-            <input type="hidden" id="reset-username"> <input type="password" id="new-password" placeholder="새로운 비밀번호" required>
+            <input type="hidden" id="reset-username">
+            <input type="hidden" id="reset-name">
+            <input type="hidden" id="reset-email">
+            <input type="password" id="new-password" placeholder="새로운 비밀번호" required>
             <input type="password" id="confirm-password" placeholder="새로운 비밀번호 확인" required>
             <button type="submit" class="auth-btn" style="background: #ff8a00;">비밀번호 변경하기</button>
         </form>
@@ -214,7 +218,7 @@
 
         modal.querySelectorAll('form').forEach(form => form.reset());
 
-        modal.querySelectorAll('.modal-message').forEach(msg => {
+        modal.querySelectorAll('[id$="-result"], [id$="-msg"]').forEach(msg => {
             msg.textContent = '';
             msg.removeAttribute('style');
         });
@@ -250,74 +254,34 @@ document.getElementById('find-id-form').addEventListener('submit', function(e) {
     });
 });
 
-// 기존 openModal 함수 수정 (결과창 초기화 로직 추가)
-function openModal(modalId) {
-    const modal = document.getElementById(modalId);
-    modal.style.display = 'flex';
-
-    // 결과 메시지 및 폼 초기화
-    if (modalId === 'findIdModal') {
-        document.getElementById('find-id-result').innerText = '';
-        document.getElementById('find-id-form').reset();
-    }
-
-    const firstInput = modal.querySelector('input');
-    if (firstInput) firstInput.focus();
-}
-
-
+// 비밀번호 찾기(확인) 단계 — 아이디+이름(닉네임)+이메일 3중 일치 확인
 document.getElementById('find-pw-form').addEventListener('submit', function(e) {
     e.preventDefault();
 
     const username = document.getElementById('find-pw-username').value;
+    const name = document.getElementById('find-pw-name').value;
     const email = document.getElementById('find-pw-email').value;
     const resultDiv = document.getElementById('find-pw-result');
 
     fetch('/api/find-pw', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 'username': username, 'email': email })
+        body: JSON.stringify({ 'username': username, 'name': name, 'email': email })
     })
     .then(res => res.json())
     .then(data => {
         if (data.success) {
-            resultDiv.innerHTML = `<span style="color: #2D63FF;">${data.message}</span>`;
-            // 여기에 나중에 "비밀번호 재설정" 버튼을 추가로 띄울 수도 있습니다.
-        } else {
-            resultDiv.innerHTML = `<span style="color: #FF4D4D;">${data.message}</span>`;
-        }
-    })
-    .catch(err => {
-        resultDiv.innerHTML = `<span style="color: #FF4D4D;">서버 통신 중 오류가 발생했습니다.</span>`;
-    });
-});
-// 비밀번호 찾기(확인) 단계
-document.getElementById('find-pw-form').addEventListener('submit', function(e) {
-    e.preventDefault();
+            // 다음 모달(resetPwModal)에서 재검증용으로 쓸 값들을 hidden input에 먼저 채워둔다.
+            // (closeModal → resetModal이 findPwModal 안의 입력값을 지워버리기 때문에 여기서 미리 옮겨야 함)
+            document.getElementById('reset-username').value = username;
+            document.getElementById('reset-name').value = name;
+            document.getElementById('reset-email').value = email;
 
-    const username = document.getElementById('find-pw-username').value;
-    const email = document.getElementById('find-pw-email').value;
-    const resultDiv = document.getElementById('find-pw-result');
-
-    // [중요] 본인의 Blueprint 설정에 따라 '/api/find-pw' 또는 '/auth/api/find-pw'로 수정하세요.
-    fetch('/api/find-pw', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 'username': username, 'email': email })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
             // 1. 성공 시 기존 모달('findPwModal')을 먼저 닫습니다.
             closeModal('findPwModal');
 
             // 2. 잠시 후에(0.1초) 새 모달을 띄웁니다. (애니메이션 충돌 방지)
             setTimeout(() => {
-                // 새 비밀번호 창에서 사용할 아이디값을 미리 입력해둡니다.
-                const resetUsernameInput = document.getElementById('reset-username');
-                if(resetUsernameInput) resetUsernameInput.value = username;
-
-                // 비밀번호 재설정 모달 열기
                 openModal('resetPwModal');
             }, 100);
 
@@ -332,13 +296,14 @@ document.getElementById('find-pw-form').addEventListener('submit', function(e) {
     });
 });
 
-// 2. 실제 비밀번호 변경 실행 단계
+// 실제 비밀번호 변경 실행 단계
 document.getElementById('reset-pw-form').addEventListener('submit', function(e) {
     e.preventDefault();
 
     const username = document.getElementById('reset-username').value;
-    // find-pw 단계에서 입력한 이메일을 함께 전송 (서버가 아이디+이메일 재검증)
-    const email = document.getElementById('find-pw-email').value;
+    const name = document.getElementById('reset-name').value;
+    // find-pw 단계에서 확인한 이름/이메일을 함께 전송 (서버가 아이디+이름+이메일 재검증)
+    const email = document.getElementById('reset-email').value;
     const password = document.getElementById('new-password').value;
     const confirm = document.getElementById('confirm-password').value;
     const msgDiv = document.getElementById('reset-pw-msg');
@@ -352,7 +317,7 @@ document.getElementById('reset-pw-form').addEventListener('submit', function(e) 
     fetch('/api/reset-pw', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 'username': username, 'email': email, 'password': password })
+        body: JSON.stringify({ 'username': username, 'name': name, 'email': email, 'password': password })
     })
     .then(res => res.json())
     .then(data => {

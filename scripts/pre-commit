@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# git pre-commit 훅 진입점. 실제 로직은 scripts/secret-scan.sh 에 있다.
+# 설치: scripts/install-hooks.sh 실행 (또는 이 파일을 .git/hooks/pre-commit 로 복사)
+repo_root="$(git rev-parse --show-toplevel)"
+scan="$repo_root/scripts/secret-scan.sh"
+if [ -f "$scan" ]; then
+    bash "$scan"
+    exit $?
+fi
+echo "[pre-commit] scripts/secret-scan.sh 없음 — 스킵"
+exit 0
